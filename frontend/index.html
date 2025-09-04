@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DYLO - Subida de Documentos</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1><i class="fas fa-file-upload"></i> DYLO - Subida de Documentos</h1>
+            <p>Herramienta para subir documentos a Humand con separación automática por RFC</p>
+        </header>
+
+        <div class="main-content">
+
+            <!-- Sección de Carpetas -->
+            <section class="card">
+                <h2><i class="fas fa-folder"></i> Selección de Carpeta</h2>
+                <div class="form-group">
+                    <button type="button" id="loadFolders" class="btn-primary">
+                        <i class="fas fa-sync"></i> Cargar Carpetas
+                    </button>
+                    <button type="button" id="loadUsers" class="btn-secondary">
+                        <i class="fas fa-users"></i> Cargar Usuarios
+                    </button>
+                </div>
+                
+                <div class="form-group">
+                    <label for="folderSearch">Buscar carpeta:</label>
+                    <input type="text" id="folderSearch" placeholder="Escriba para filtrar carpetas...">
+                </div>
+                
+                <div class="folder-list-container">
+                    <select id="folderSelect" size="6">
+                        <option value="">Primero cargue las carpetas disponibles</option>
+                    </select>
+                </div>
+                
+                <div id="folderInfo" class="info-box" style="display: none;">
+                    <strong>Carpeta seleccionada:</strong> <span id="selectedFolderName"></span>
+                </div>
+            </section>
+
+            <!-- Sección de Configuración -->
+            <section class="card">
+                <h2><i class="fas fa-cog"></i> Configuración</h2>
+                
+                <div class="form-group">
+                    <label for="prefix">Prefijo para nombres de archivo (opcional):</label>
+                    <input type="text" id="prefix" placeholder="Ej: NOMINA_2024">
+                    <small>Vista previa: <span id="prefixPreview">[USERNAME].pdf</span></small>
+                </div>
+                
+                <div class="form-group">
+                    <label>Requisitos de firma:</label>
+                    <div class="radio-group">
+                        <label class="radio-label">
+                            <input type="radio" name="signatureStatus" value="SIGNATURE_NOT_NEEDED" checked>
+                            <span>No requiere firma</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="signatureStatus" value="PENDING">
+                            <span>Requiere firma</span>
+                        </label>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Sección de Archivos -->
+            <section class="card">
+                <h2><i class="fas fa-file-pdf"></i> Selección de Archivos PDF</h2>
+                
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-content">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <p>Arrastre archivos PDF aquí o haga clic para seleccionar</p>
+                        <input type="file" id="fileInput" multiple accept=".pdf" style="display: none;">
+                        <button type="button" id="selectFiles" class="btn-primary">
+                            <i class="fas fa-folder-open"></i> Seleccionar Archivos
+                        </button>
+                    </div>
+                </div>
+                
+                <div id="fileList" class="file-list" style="display: none;">
+                    <h3>Archivos seleccionados:</h3>
+                    <ul id="selectedFiles"></ul>
+                </div>
+            </section>
+
+            <!-- Sección de Procesamiento -->
+            <section class="card">
+                <h2><i class="fas fa-play"></i> Procesamiento</h2>
+                
+                <div class="process-buttons">
+                    <button type="button" id="processBtn" class="btn-success" disabled>
+                        <i class="fas fa-cogs"></i> Procesar y Subir Documentos
+                    </button>
+                </div>
+                
+                <div id="progressSection" class="progress-section" style="display: none;">
+                    <div class="progress-bar">
+                        <div id="progressFill" class="progress-fill"></div>
+                    </div>
+                    <div id="progressText" class="progress-text">Preparando...</div>
+                </div>
+            </section>
+
+            <!-- Sección de Resultados -->
+            <section class="card" id="resultsSection" style="display: none;">
+                <h2><i class="fas fa-chart-bar"></i> Resultados</h2>
+                <div id="resultsContent"></div>
+            </section>
+
+            <!-- Sección de Log -->
+            <section class="card">
+                <h2><i class="fas fa-list"></i> Registro de Actividad</h2>
+                
+                <div class="log-controls">
+                    <button type="button" id="clearLog" class="btn-secondary">
+                        <i class="fas fa-trash"></i> Limpiar
+                    </button>
+                    <button type="button" id="downloadLog" class="btn-secondary">
+                        <i class="fas fa-download"></i> Descargar
+                    </button>
+                </div>
+                
+                <div id="logArea" class="log-area"></div>
+            </section>
+        </div>
+
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <span id="statusText">Listo</span>
+            <div class="status-indicators">
+                <span id="folderStatus" class="status-indicator">
+                    <i class="fas fa-folder"></i> <span>0 carpetas</span>
+                </span>
+                <span id="userStatus" class="status-indicator">
+                    <i class="fas fa-users"></i> <span>0 usuarios</span>
+                </span>
+                <span id="fileStatus" class="status-indicator">
+                    <i class="fas fa-file"></i> <span>0 archivos</span>
+                </span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmación -->
+    <div id="confirmModal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3><i class="fas fa-question-circle"></i> Confirmar Procesamiento</h3>
+            <div id="confirmContent"></div>
+            <div class="modal-buttons">
+                <button type="button" id="confirmYes" class="btn-success">
+                    <i class="fas fa-check"></i> Continuar
+                </button>
+                <button type="button" id="confirmNo" class="btn-secondary">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
