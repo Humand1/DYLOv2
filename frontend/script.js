@@ -46,6 +46,7 @@ const startOverBtn = document.getElementById('startOver');
 // Elementos de configuración
 const prefixInput = document.getElementById('prefix');
 const prefixPreview = document.getElementById('prefixPreview');
+const sendNotificationCheckbox = document.getElementById('sendNotification');
 const fileConfigList = document.getElementById('fileConfigList');
 
 // Elementos de vista previa PDF
@@ -1277,6 +1278,10 @@ async function processDocuments() {
         if (prefix) {
             formData.append('prefix', prefix);
         }
+        
+        // Agregar configuración de notificación
+        const sendNotification = sendNotificationCheckbox.checked;
+        formData.append('send_notification', sendNotification.toString());
         
         // Actualizar progreso
         updateProgress(10, 'Subiendo archivos al servidor...');

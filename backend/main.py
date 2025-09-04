@@ -121,7 +121,8 @@ async def upload_documents(
     folder_id: str = Form(...),
     signature_status: str = Form("SIGNATURE_NOT_NEEDED"),
     prefix: Optional[str] = Form(None),
-    signature_coordinates: Optional[str] = Form(None)
+    signature_coordinates: Optional[str] = Form(None),
+    send_notification: str = Form("true")
 ):
     """Procesa y sube múltiples archivos PDF a Humand"""
     
@@ -143,6 +144,9 @@ async def upload_documents(
                 signature_configs = json.loads(signature_coordinates)
             except json.JSONDecodeError:
                 raise HTTPException(status_code=400, detail="Configuraciones de firma inválidas")
+        
+        # Convertir string a boolean
+        send_notification_bool = send_notification.lower() == 'true'
         
         # Procesar archivos
         processor = PDFProcessor(usuarios_rfc)
@@ -192,7 +196,8 @@ async def upload_documents(
                             processed_file=processed_file,
                             folder_id=folder_id,
                             signature_status=signature_status,
-                            signature_coordinates=signature_coordinates_list
+                            signature_coordinates=signature_coordinates_list,
+                            send_notification=send_notification_bool
                         )
                         
                         if result.get('success'):

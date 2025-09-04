@@ -16,7 +16,8 @@ class HumandClient:
                    processed_file: ProcessedFile,
                    folder_id: str,
                    signature_status: SignatureStatus = SignatureStatus.SIGNATURE_NOT_NEEDED,
-                   signature_coordinates: Optional[List[APISignatureCoordinates]] = None) -> dict:
+                   signature_coordinates: Optional[List[APISignatureCoordinates]] = None,
+                   send_notification: bool = True) -> dict:
         """Sube un archivo procesado a la plataforma Humand"""
         
         # Solo subir archivos que tienen username válido
@@ -32,7 +33,7 @@ class HumandClient:
             payload = {
                 'folderId': str(folder_id),
                 'name': processed_file.filename,
-                'sendNotification': 'false',
+                'sendNotification': 'true' if send_notification else 'false',
                 'signatureStatus': signature_status.value,
                 'allowDisagreement': 'false'
             }
@@ -86,7 +87,8 @@ class HumandClient:
                             processed_files: List[ProcessedFile],
                             folder_id: str,
                             signature_status: SignatureStatus = SignatureStatus.SIGNATURE_NOT_NEEDED,
-                            signature_coordinates: Optional[List[APISignatureCoordinates]] = None) -> dict:
+                            signature_coordinates: Optional[List[APISignatureCoordinates]] = None,
+                            send_notification: bool = True) -> dict:
         """Sube múltiples archivos procesados a la plataforma Humand"""
         
         results = {
@@ -102,7 +104,8 @@ class HumandClient:
                 processed_file=processed_file,
                 folder_id=folder_id,
                 signature_status=signature_status,
-                signature_coordinates=signature_coordinates
+                signature_coordinates=signature_coordinates,
+                send_notification=send_notification
             )
             
             if result['success']:
