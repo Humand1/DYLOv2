@@ -6,6 +6,8 @@
     <title>DYLO - Subida de Documentos</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- PDF.js -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
     <div class="container">
@@ -15,10 +17,9 @@
         </header>
 
         <div class="main-content">
-
-            <!-- Sección de Carpetas -->
-            <section class="card">
-                <h2><i class="fas fa-folder"></i> Selección de Carpeta</h2>
+            <!-- Paso 1: Selección de Carpeta -->
+            <section class="card step-card" id="step1">
+                <h2><i class="fas fa-folder"></i> Paso 1: Selección de Carpeta Destino</h2>
                 <div class="form-group">
                     <button type="button" id="loadFolders" class="btn-primary">
                         <i class="fas fa-sync"></i> Cargar Carpetas
@@ -44,58 +45,136 @@
                 </div>
             </section>
 
-            <!-- Sección de Configuración -->
-            <section class="card">
-                <h2><i class="fas fa-cog"></i> Configuración</h2>
+            <!-- Paso 2: Subida de Archivos -->
+            <section class="card step-card" id="step2">
+                <h2><i class="fas fa-file-upload"></i> Paso 2: Subida de Archivos PDF</h2>
+                
+                <div class="upload-options">
+                    <div class="upload-option">
+                        <h3><i class="fas fa-file"></i> Archivos Individuales</h3>
+                        <div class="upload-area" id="uploadArea">
+                            <div class="upload-content">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <p>Arrastre archivos PDF aquí o haga clic para seleccionar</p>
+                                <input type="file" id="fileInput" multiple accept=".pdf" style="display: none;">
+                                <button type="button" id="selectFiles" class="btn-primary">
+                                    <i class="fas fa-folder-open"></i> Seleccionar Archivos
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="upload-option">
+                        <h3><i class="fas fa-folder"></i> Carpeta Completa</h3>
+                        <div class="upload-area" id="uploadFolderArea">
+                            <div class="upload-content">
+                                <i class="fas fa-folder-open"></i>
+                                <p>Seleccione una carpeta con archivos PDF</p>
+                                <input type="file" id="folderInput" webkitdirectory directory multiple style="display: none;">
+                                <button type="button" id="selectFolder" class="btn-primary">
+                                    <i class="fas fa-folder"></i> Seleccionar Carpeta
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="fileList" class="file-list" style="display: none;">
+                    <h3>Archivos cargados:</h3>
+                    <div id="selectedFiles"></div>
+                    <div class="step-navigation">
+                        <button type="button" id="nextToConfig" class="btn-success" disabled>
+                            <i class="fas fa-arrow-right"></i> Continuar a Configuración
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Paso 3: Configuración por Archivo -->
+            <section class="card step-card" id="step3" style="display: none;">
+                <h2><i class="fas fa-cog"></i> Paso 3: Configuración de Documentos</h2>
                 
                 <div class="form-group">
                     <label for="prefix">Prefijo para nombres de archivo (opcional):</label>
                     <input type="text" id="prefix" placeholder="Ej: NOMINA_2024">
                     <small>Vista previa: <span id="prefixPreview">[USERNAME].pdf</span></small>
                 </div>
+
+                <div class="file-config-list" id="fileConfigList">
+                    <!-- Los archivos se cargarán dinámicamente aquí -->
+                </div>
                 
-                <div class="form-group">
-                    <label>Requisitos de firma:</label>
-                    <div class="radio-group">
-                        <label class="radio-label">
-                            <input type="radio" name="signatureStatus" value="SIGNATURE_NOT_NEEDED" checked>
-                            <span>No requiere firma</span>
-                        </label>
-                        <label class="radio-label">
-                            <input type="radio" name="signatureStatus" value="PENDING">
-                            <span>Requiere firma</span>
-                        </label>
-                    </div>
+                <div class="step-navigation">
+                    <button type="button" id="backToUpload" class="btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Volver a Subida
+                    </button>
+                    <button type="button" id="nextToPreview" class="btn-success">
+                        <i class="fas fa-arrow-right"></i> Vista Previa y Firma
+                    </button>
                 </div>
             </section>
 
-            <!-- Sección de Archivos -->
-            <section class="card">
-                <h2><i class="fas fa-file-pdf"></i> Selección de Archivos PDF</h2>
+            <!-- Paso 4: Vista Previa y Selección de Firma -->
+            <section class="card step-card" id="step4" style="display: none;">
+                <h2><i class="fas fa-eye"></i> Paso 4: Vista Previa y Configuración de Firma</h2>
                 
-                <div class="upload-area" id="uploadArea">
-                    <div class="upload-content">
-                        <i class="fas fa-cloud-upload-alt"></i>
-                        <p>Arrastre archivos PDF aquí o haga clic para seleccionar</p>
-                        <input type="file" id="fileInput" multiple accept=".pdf" style="display: none;">
-                        <button type="button" id="selectFiles" class="btn-primary">
-                            <i class="fas fa-folder-open"></i> Seleccionar Archivos
-                        </button>
+                <div class="preview-container">
+                    <div class="file-selector">
+                        <h3>Archivos que requieren firma:</h3>
+                        <select id="signatureFileSelect" size="5">
+                            <!-- Se llenarán dinámicamente -->
+                        </select>
+                    </div>
+                    
+                    <div class="pdf-preview-container" id="pdfPreviewContainer" style="display: none;">
+                        <h3 id="currentFileName">Archivo actual</h3>
+                        <div class="pdf-controls">
+                            <button type="button" id="prevPage" class="btn-secondary">
+                                <i class="fas fa-chevron-left"></i> Anterior
+                            </button>
+                            <span id="pageInfo">Página 1 de 1</span>
+                            <button type="button" id="nextPage" class="btn-secondary">
+                                <i class="fas fa-chevron-right"></i> Siguiente
+                            </button>
+                        </div>
+                        <div class="pdf-canvas-container">
+                            <canvas id="pdfCanvas"></canvas>
+                            <div id="signatureSelector" class="signature-selector" style="display: none;"></div>
+                        </div>
+                        <div class="signature-controls">
+                            <button type="button" id="selectSignatureArea" class="btn-primary">
+                                <i class="fas fa-signature"></i> Seleccionar Área de Firma
+                            </button>
+                            <button type="button" id="clearSignatureArea" class="btn-secondary">
+                                <i class="fas fa-eraser"></i> Limpiar Selección
+                            </button>
+                            <div id="signatureCoords" class="signature-info" style="display: none;">
+                                <strong>Coordenadas:</strong> <span id="coordsText"></span>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 
-                <div id="fileList" class="file-list" style="display: none;">
-                    <h3>Archivos seleccionados:</h3>
-                    <ul id="selectedFiles"></ul>
+                <div class="step-navigation">
+                    <button type="button" id="backToConfig" class="btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Volver a Configuración
+                    </button>
+                    <button type="button" id="nextToProcess" class="btn-success">
+                        <i class="fas fa-arrow-right"></i> Procesar Documentos
+                    </button>
                 </div>
             </section>
 
-            <!-- Sección de Procesamiento -->
-            <section class="card">
-                <h2><i class="fas fa-play"></i> Procesamiento</h2>
+            <!-- Paso 5: Procesamiento -->
+            <section class="card step-card" id="step5" style="display: none;">
+                <h2><i class="fas fa-play"></i> Paso 5: Procesamiento Final</h2>
+                
+                <div id="processSummary" class="process-summary">
+                    <!-- Resumen se generará dinámicamente -->
+                </div>
                 
                 <div class="process-buttons">
-                    <button type="button" id="processBtn" class="btn-success" disabled>
+                    <button type="button" id="processBtn" class="btn-success">
                         <i class="fas fa-cogs"></i> Procesar y Subir Documentos
                     </button>
                 </div>
@@ -106,12 +185,23 @@
                     </div>
                     <div id="progressText" class="progress-text">Preparando...</div>
                 </div>
+                
+                <div class="step-navigation">
+                    <button type="button" id="backToPreview" class="btn-secondary">
+                        <i class="fas fa-arrow-left"></i> Volver a Vista Previa
+                    </button>
+                </div>
             </section>
 
             <!-- Sección de Resultados -->
             <section class="card" id="resultsSection" style="display: none;">
                 <h2><i class="fas fa-chart-bar"></i> Resultados</h2>
                 <div id="resultsContent"></div>
+                <div class="step-navigation">
+                    <button type="button" id="startOver" class="btn-primary">
+                        <i class="fas fa-refresh"></i> Procesar Nuevos Documentos
+                    </button>
+                </div>
             </section>
 
             <!-- Sección de Log -->

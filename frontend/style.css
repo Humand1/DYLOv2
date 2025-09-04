@@ -559,3 +559,400 @@ body {
 .log-area::-webkit-scrollbar-thumb:hover {
     background: #718096;
 }
+
+/* Estilos para el nuevo flujo por pasos */
+.step-card {
+    position: relative;
+    border-left: 4px solid #667eea;
+}
+
+.step-card h2 {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* Upload options */
+.upload-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.upload-option {
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    transition: all 0.3s ease;
+}
+
+.upload-option:hover {
+    border-color: #667eea;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.1);
+}
+
+.upload-option h3 {
+    color: #4a5568;
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* Step navigation */
+.step-navigation {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 25px;
+    padding-top: 20px;
+    border-top: 1px solid #e2e8f0;
+}
+
+/* File items */
+.file-item {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 10px;
+    transition: all 0.3s ease;
+}
+
+.file-item:hover {
+    border-color: #667eea;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.1);
+}
+
+.file-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.file-name {
+    font-weight: 600;
+    color: #4a5568;
+    flex: 1;
+}
+
+.file-size {
+    color: #718096;
+}
+
+/* File configuration */
+.file-config-item {
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 15px;
+}
+
+.file-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 15px;
+    font-weight: 600;
+    color: #4a5568;
+}
+
+.config-options {
+    padding-left: 24px;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+    font-weight: normal;
+}
+
+.checkbox-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #667eea;
+}
+
+/* Preview container */
+.preview-container {
+    display: grid;
+    grid-template-columns: 300px 1fr;
+    gap: 20px;
+    min-height: 500px;
+}
+
+.file-selector {
+    background: #f7fafc;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.file-selector h3 {
+    color: #4a5568;
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+}
+
+#signatureFileSelect {
+    width: 100%;
+    padding: 10px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 1rem;
+    background: white;
+}
+
+/* PDF preview */
+.pdf-preview-container {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 20px;
+}
+
+.pdf-preview-container h3 {
+    color: #4a5568;
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+}
+
+.pdf-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+    padding: 10px;
+    background: #f7fafc;
+    border-radius: 8px;
+}
+
+#pageInfo {
+    font-weight: 600;
+    color: #4a5568;
+    min-width: 120px;
+    text-align: center;
+}
+
+.pdf-canvas-container {
+    position: relative;
+    display: flex;
+    justify-content: center;
+    margin-bottom: 20px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+#pdfCanvas {
+    max-width: 100%;
+    height: auto;
+    display: block;
+}
+
+/* Signature selector */
+.signature-selector {
+    position: absolute;
+    pointer-events: none;
+    z-index: 10;
+}
+
+.signature-controls {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 15px;
+    flex-wrap: wrap;
+}
+
+.signature-info {
+    background: #e6fffa;
+    border: 1px solid #81e6d9;
+    border-radius: 6px;
+    padding: 10px;
+    color: #234e52;
+    font-size: 0.9rem;
+    text-align: center;
+    min-width: 200px;
+}
+
+/* Process summary */
+.process-summary {
+    background: #f7fafc;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.summary-section {
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.summary-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.summary-section h3 {
+    color: #4a5568;
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.summary-section p {
+    color: #718096;
+    margin-bottom: 5px;
+}
+
+.summary-section ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+.summary-section li {
+    padding: 8px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: #4a5568;
+}
+
+.text-success {
+    color: #38a169 !important;
+}
+
+.text-warning {
+    color: #d69e2e !important;
+}
+
+/* Alert styles */
+.alert {
+    padding: 15px;
+    border-radius: 8px;
+    margin: 15px 0;
+}
+
+.alert-warning {
+    background: #fffbeb;
+    border: 1px solid #f6e05e;
+    color: #744210;
+}
+
+/* Responsive adjustments for new layout */
+@media (max-width: 1024px) {
+    .upload-options {
+        grid-template-columns: 1fr;
+    }
+    
+    .preview-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .file-selector {
+        order: 2;
+    }
+    
+    .pdf-preview-container {
+        order: 1;
+    }
+}
+
+@media (max-width: 768px) {
+    .step-navigation {
+        flex-direction: column;
+        gap: 15px;
+    }
+    
+    .signature-controls {
+        flex-direction: column;
+    }
+    
+    .pdf-controls {
+        flex-wrap: wrap;
+        gap: 10px;
+    }
+    
+    .signature-info {
+        min-width: auto;
+        width: 100%;
+    }
+}
+
+/* Enhanced animations for step transitions */
+.step-card {
+    animation: slideInUp 0.5s ease-out;
+}
+
+@keyframes slideInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* PDF loading indicator */
+.pdf-loading {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 200px;
+    color: #718096;
+    font-size: 1.1rem;
+}
+
+/* Enhanced button states */
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-success:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
+/* File drag and drop enhancements */
+.upload-area.dragover {
+    border-color: #48bb78;
+    background: rgba(72, 187, 120, 0.05);
+    transform: scale(1.02);
+}
+
+/* Signature area selection cursor */
+.pdf-canvas-container.selecting {
+    cursor: crosshair;
+}
+
+/* Enhanced log styling */
+.log-entry.info {
+    color: #e2e8f0;
+}
+
+.log-entry.success::before {
+    content: "✓ ";
+    color: #9ae6b4;
+}
+
+.log-entry.error::before {
+    content: "✗ ";
+    color: #feb2b2;
+}
+
+.log-entry.warning::before {
+    content: "⚠ ";
+    color: #fbd38d;
+}
