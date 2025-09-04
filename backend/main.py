@@ -12,7 +12,7 @@ from .models import (
     SignatureData, APISignatureCoordinates, ProcessedFile
 )
 from .redash_client import RedashClient
-# from .pdf_processor import PDFProcessor  # Comentado temporalmente por problemas con PyMuPDF
+from .pdf_processor import PDFProcessor
 from .humand_client import HumandClient
 
 app = FastAPI(title="DYLO Document Upload API", version="1.0.0")
@@ -82,17 +82,23 @@ async def process_pdf(
         if not usuarios_rfc:
             raise HTTPException(status_code=500, detail="No se pudieron cargar los usuarios")
         
-        # Procesar el PDF - Comentado temporalmente
-        # processor = PDFProcessor(usuarios_rfc)
-        # processed_files = processor.process_pdf(temp_file.name, prefix)
+        # Procesar el PDF
+        processor = PDFProcessor(usuarios_rfc)
+        processed_files = processor.process_pdf(temp_file.name, prefix)
         
-        # Respuesta temporal para testing
         return {
-            "success": False,
-            "message": "Procesamiento de PDF temporalmente deshabilitado - PyMuPDF no instalado",
-            "processed_files": [],
-            "total_files": 0,
-            "valid_usernames": 0,
+            "success": True,
+            "message": f"PDF procesado exitosamente. {len(processed_files)} archivos generados.",
+            "processed_files": [
+                {
+                    "filename": pf.filename,
+                    "username": pf.username,
+                    "pages": pf.pages,
+                    "file_path": pf.file_path
+                } for pf in processed_files
+            ],
+            "total_files": len(processed_files),
+            "valid_usernames": len(set(pf.username for pf in processed_files)),
             "pending_files": 0
         }
         
@@ -130,15 +136,103 @@ async def upload_documents(
         if not usuarios_rfc:
             raise HTTPException(status_code=500, detail="No se pudieron cargar los usuarios")
         
-        # Respuesta temporal para testing - PDF processing deshabilitado
+        # Procesar configuraciones de firma
+        signature_configs = {}
+        if signature_coordinates:
+            try:
+                signature_configs = json.loads(signature_coordinates)
+            except json.JSONDecodeError:
+                raise HTTPException(status_code=400, detail="Configuraciones de firma inválidas")
+        
+        # Procesar archivos
+        processor = PDFProcessor(usuarios_rfc)
+        humand_client = HumandClient(HARDCODED_API_KEY)
+        
+        all_processed_files = []
+        uploaded_files = 0
+        errors = []
+        success_details = []
+        
+        for file in files:
+            try:
+                # Crear archivo temporal
+                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+                content = await file.read()
+                temp_file.write(content)
+                temp_file.close()
+                
+                # Obtener configuración de firma para este archivo
+                file_signature_config = signature_configs.get(file.filename, {})
+                requires_signature = file_signature_config.get('requiresSignature', False)
+                coords = file_signature_config.get('signatureCoords')
+                
+                # Procesar PDF
+                processed_files = processor.process_pdf(temp_file.name, prefix)
+                all_processed_files.extend(processed_files)
+                
+                # Subir cada archivo procesado
+                for processed_file in processed_files:
+                    try:
+                        # Preparar datos de firma si es necesario
+                        signature_data = None
+                        if requires_signature and coords:
+                            signature_data = APISignatureCoordinates(
+                                x1=coords['x1'],
+                                y1=coords['y1'],
+                                x2=coords['x2'],
+                                y2=coords['y2'],
+                                page=coords['page']
+                            )
+                        
+                        # Subir a Humand
+                        result = humand_client.upload_document(
+                            file_path=processed_file.file_path,
+                            folder_id=folder_id,
+                            signature_coordinates=signature_data
+                        )
+                        
+                        if result.get('success'):
+                            uploaded_files += 1
+                            success_details.append({
+                                'filename': processed_file.filename,
+                                'identifier': processed_file.username,
+                                'pages': processed_file.pages
+                            })
+                        else:
+                            errors.append({
+                                'filename': processed_file.filename,
+                                'error': result.get('message', 'Error desconocido')
+                            })
+                    
+                    except Exception as upload_error:
+                        errors.append({
+                            'filename': processed_file.filename,
+                            'error': str(upload_error)
+                        })
+                
+                # Limpiar archivo temporal original
+                try:
+                    os.unlink(temp_file.name)
+                except:
+                    pass
+                    
+            except Exception as file_error:
+                errors.append({
+                    'filename': file.filename,
+                    'error': str(file_error)
+                })
+        
+        # Limpiar archivos procesados
+        processor.cleanup_temp_files(all_processed_files)
+        
         return {
-            "success": False,
-            "message": "Procesamiento y subida de documentos temporalmente deshabilitado - PyMuPDF no instalado",
-            "uploaded_files": 0,
-            "total_files": len(files),
-            "skipped_files": len(files),
-            "errors": [{"filename": f.filename, "error": "PyMuPDF no disponible"} for f in files],
-            "success_details": []
+            "success": uploaded_files > 0,
+            "message": f"Procesamiento completado. {uploaded_files} archivos subidos exitosamente.",
+            "uploaded_files": uploaded_files,
+            "total_files": len(all_processed_files),
+            "skipped_files": len(all_processed_files) - uploaded_files,
+            "errors": errors,
+            "success_details": success_details
         }
         
     except Exception as e:
