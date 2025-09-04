@@ -740,86 +740,362 @@ function changePage(delta) {
     }
 }
 
+// Variables para el manejo avanzado de área de firma
+let signatureMode = 'none'; // 'none', 'selecting', 'moving', 'resizing'
+let dragStartX, dragStartY;
+let resizeHandle = null;
+let originalRect = null;
+
 function enableSignatureSelection() {
-    signatureSelector.style.display = 'block';
-    signatureSelector.style.cursor = 'crosshair';
+    signatureMode = 'selecting';
+    pdfCanvas.style.cursor = 'crosshair';
     
-    let isSelecting = false;
-    let startX, startY;
+    // Crear handles de redimensionamiento si no existen
+    createResizeHandles();
     
-    const handleMouseDown = (e) => {
-        isSelecting = true;
-        const rect = pdfCanvas.getBoundingClientRect();
-        startX = e.clientX - rect.left;
-        startY = e.clientY - rect.top;
+    addLog('Modo selección activado - Haga clic y arrastre para seleccionar el área de firma', 'info');
+    addLog('💡 Tip: Una vez creada, puede mover el rectángulo o usar las esquinas para redimensionar', 'info');
+}
+
+function createResizeHandles() {
+    // Eliminar handles existentes
+    document.querySelectorAll('.resize-handle').forEach(handle => handle.remove());
+    
+    // Crear 8 handles (4 esquinas + 4 lados)
+    const handlePositions = [
+        { class: 'nw-resize', position: 'top-left' },
+        { class: 'n-resize', position: 'top-center' },
+        { class: 'ne-resize', position: 'top-right' },
+        { class: 'e-resize', position: 'middle-right' },
+        { class: 'se-resize', position: 'bottom-right' },
+        { class: 's-resize', position: 'bottom-center' },
+        { class: 'sw-resize', position: 'bottom-left' },
+        { class: 'w-resize', position: 'middle-left' }
+    ];
+    
+    handlePositions.forEach(({ class: cursorClass, position }) => {
+        const handle = document.createElement('div');
+        handle.className = `resize-handle ${position}`;
+        handle.style.cssText = `
+            position: absolute;
+            width: 8px;
+            height: 8px;
+            background: #007bff;
+            border: 1px solid white;
+            cursor: ${cursorClass};
+            display: none;
+            z-index: 1000;
+        `;
+        handle.dataset.position = position;
+        pdfPreviewContainer.appendChild(handle);
+    });
+}
+
+// Event listeners mejorados para el canvas
+pdfCanvas.addEventListener('mousedown', handleCanvasMouseDown);
+pdfCanvas.addEventListener('mousemove', handleCanvasMouseMove);
+pdfCanvas.addEventListener('mouseup', handleCanvasMouseUp);
+document.addEventListener('mousemove', handleDocumentMouseMove);
+document.addEventListener('mouseup', handleDocumentMouseUp);
+
+function handleCanvasMouseDown(e) {
+    e.preventDefault();
+    const rect = pdfCanvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    // Verificar si hay un área de firma existente
+    const existingCoords = fileConfigurations[currentFileIndex]?.signatureCoords;
+    
+    if (existingCoords && existingCoords.page === currentPageNum) {
+        const canvasWidth = pdfCanvas.width;
+        const canvasHeight = pdfCanvas.height;
         
-        signatureSelector.style.left = startX + 'px';
-        signatureSelector.style.top = startY + 'px';
+        const left = (existingCoords.x1 / canvasWidth) * rect.width;
+        const top = (existingCoords.y1 / canvasHeight) * rect.height;
+        const width = ((existingCoords.x2 - existingCoords.x1) / canvasWidth) * rect.width;
+        const height = ((existingCoords.y2 - existingCoords.y1) / canvasHeight) * rect.height;
+        
+        // Verificar si el clic está dentro del rectángulo existente
+        if (mouseX >= left && mouseX <= left + width && 
+            mouseY >= top && mouseY <= top + height) {
+            
+            // Verificar si está en un handle de redimensionamiento
+            const handleSize = 8;
+            const handles = [
+                { x: left, y: top, cursor: 'nw-resize', type: 'nw' },
+                { x: left + width/2, y: top, cursor: 'n-resize', type: 'n' },
+                { x: left + width, y: top, cursor: 'ne-resize', type: 'ne' },
+                { x: left + width, y: top + height/2, cursor: 'e-resize', type: 'e' },
+                { x: left + width, y: top + height, cursor: 'se-resize', type: 'se' },
+                { x: left + width/2, y: top + height, cursor: 's-resize', type: 's' },
+                { x: left, y: top + height, cursor: 'sw-resize', type: 'sw' },
+                { x: left, y: top + height/2, cursor: 'w-resize', type: 'w' }
+            ];
+            
+            for (let handle of handles) {
+                if (Math.abs(mouseX - handle.x) <= handleSize && 
+                    Math.abs(mouseY - handle.y) <= handleSize) {
+                    signatureMode = 'resizing';
+                    resizeHandle = handle.type;
+                    dragStartX = mouseX;
+                    dragStartY = mouseY;
+                    originalRect = { left, top, width, height };
+                    pdfCanvas.style.cursor = handle.cursor;
+                    return;
+                }
+            }
+            
+            // Si no está en un handle, iniciar movimiento
+            signatureMode = 'moving';
+            dragStartX = mouseX;
+            dragStartY = mouseY;
+            originalRect = { left, top, width, height };
+            pdfCanvas.style.cursor = 'move';
+            return;
+        }
+    }
+    
+    // Si no hay rectángulo existente o el clic está fuera, crear nuevo
+    if (signatureMode === 'selecting') {
+        signatureMode = 'creating';
+        dragStartX = mouseX;
+        dragStartY = mouseY;
+        
+        // Inicializar el selector
+        signatureSelector.style.display = 'block';
+        signatureSelector.style.left = mouseX + 'px';
+        signatureSelector.style.top = mouseY + 'px';
         signatureSelector.style.width = '0px';
         signatureSelector.style.height = '0px';
         signatureSelector.style.border = '2px dashed #007bff';
         signatureSelector.style.backgroundColor = 'rgba(0, 123, 255, 0.1)';
-    };
+    }
+}
+
+function handleCanvasMouseMove(e) {
+    if (signatureMode === 'none') return;
     
-    const handleMouseMove = (e) => {
-        if (!isSelecting) return;
-        
+    const rect = pdfCanvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    
+    // Actualizar cursor basado en la posición
+    updateCursorForPosition(mouseX, mouseY);
+}
+
+function handleDocumentMouseMove(e) {
+    if (signatureMode === 'creating') {
         const rect = pdfCanvas.getBoundingClientRect();
         const currentX = e.clientX - rect.left;
         const currentY = e.clientY - rect.top;
         
-        const width = Math.abs(currentX - startX);
-        const height = Math.abs(currentY - startY);
-        const left = Math.min(startX, currentX);
-        const top = Math.min(startY, currentY);
+        // Calcular dimensiones del rectángulo
+        const width = Math.abs(currentX - dragStartX);
+        const height = Math.abs(currentY - dragStartY);
+        const left = Math.min(dragStartX, currentX);
+        const top = Math.min(dragStartY, currentY);
         
+        // Actualizar el selector visual
         signatureSelector.style.left = left + 'px';
         signatureSelector.style.top = top + 'px';
         signatureSelector.style.width = width + 'px';
         signatureSelector.style.height = height + 'px';
-    };
-    
-    const handleMouseUp = (e) => {
-        if (!isSelecting) return;
         
-        isSelecting = false;
+    } else if (signatureMode === 'moving') {
+        const rect = pdfCanvas.getBoundingClientRect();
+        const currentX = e.clientX - rect.left;
+        const currentY = e.clientY - rect.top;
         
+        const deltaX = currentX - dragStartX;
+        const deltaY = currentY - dragStartY;
+        
+        const newLeft = Math.max(0, Math.min(rect.width - originalRect.width, originalRect.left + deltaX));
+        const newTop = Math.max(0, Math.min(rect.height - originalRect.height, originalRect.top + deltaY));
+        
+        // Actualizar posición visual
+        signatureSelector.style.left = newLeft + 'px';
+        signatureSelector.style.top = newTop + 'px';
+        
+    } else if (signatureMode === 'resizing') {
+        const rect = pdfCanvas.getBoundingClientRect();
+        const currentX = e.clientX - rect.left;
+        const currentY = e.clientY - rect.top;
+        
+        const deltaX = currentX - dragStartX;
+        const deltaY = currentY - dragStartY;
+        
+        let newLeft = originalRect.left;
+        let newTop = originalRect.top;
+        let newWidth = originalRect.width;
+        let newHeight = originalRect.height;
+        
+        // Aplicar cambios según el handle
+        switch (resizeHandle) {
+            case 'nw':
+                newLeft = Math.min(originalRect.left + deltaX, originalRect.left + originalRect.width - 10);
+                newTop = Math.min(originalRect.top + deltaY, originalRect.top + originalRect.height - 10);
+                newWidth = originalRect.width - (newLeft - originalRect.left);
+                newHeight = originalRect.height - (newTop - originalRect.top);
+                break;
+            case 'n':
+                newTop = Math.min(originalRect.top + deltaY, originalRect.top + originalRect.height - 10);
+                newHeight = originalRect.height - (newTop - originalRect.top);
+                break;
+            case 'ne':
+                newTop = Math.min(originalRect.top + deltaY, originalRect.top + originalRect.height - 10);
+                newWidth = Math.max(10, originalRect.width + deltaX);
+                newHeight = originalRect.height - (newTop - originalRect.top);
+                break;
+            case 'e':
+                newWidth = Math.max(10, originalRect.width + deltaX);
+                break;
+            case 'se':
+                newWidth = Math.max(10, originalRect.width + deltaX);
+                newHeight = Math.max(10, originalRect.height + deltaY);
+                break;
+            case 's':
+                newHeight = Math.max(10, originalRect.height + deltaY);
+                break;
+            case 'sw':
+                newLeft = Math.min(originalRect.left + deltaX, originalRect.left + originalRect.width - 10);
+                newWidth = originalRect.width - (newLeft - originalRect.left);
+                newHeight = Math.max(10, originalRect.height + deltaY);
+                break;
+            case 'w':
+                newLeft = Math.min(originalRect.left + deltaX, originalRect.left + originalRect.width - 10);
+                newWidth = originalRect.width - (newLeft - originalRect.left);
+                break;
+        }
+        
+        // Aplicar límites del canvas
+        newLeft = Math.max(0, Math.min(rect.width - newWidth, newLeft));
+        newTop = Math.max(0, Math.min(rect.height - newHeight, newTop));
+        
+        // Actualizar posición visual
+        signatureSelector.style.left = newLeft + 'px';
+        signatureSelector.style.top = newTop + 'px';
+        signatureSelector.style.width = newWidth + 'px';
+        signatureSelector.style.height = newHeight + 'px';
+    }
+}
+
+function handleDocumentMouseUp(e) {
+    if (signatureMode === 'creating') {
         const rect = pdfCanvas.getBoundingClientRect();
         const endX = e.clientX - rect.left;
         const endY = e.clientY - rect.top;
         
-        // Calcular coordenadas relativas al PDF
+        // Calcular coordenadas finales
         const canvasWidth = pdfCanvas.width;
         const canvasHeight = pdfCanvas.height;
         
-        const x1 = Math.min(startX, endX) / rect.width * canvasWidth;
-        const y1 = Math.min(startY, endY) / rect.height * canvasHeight;
-        const x2 = Math.max(startX, endX) / rect.width * canvasWidth;
-        const y2 = Math.max(startY, endY) / rect.height * canvasHeight;
+        const x1 = Math.min(dragStartX, endX) / rect.width * canvasWidth;
+        const y1 = Math.min(dragStartY, endY) / rect.height * canvasHeight;
+        const x2 = Math.max(dragStartX, endX) / rect.width * canvasWidth;
+        const y2 = Math.max(dragStartY, endY) / rect.height * canvasHeight;
         
-        // Guardar coordenadas
-        const coords = { x1, y1, x2, y2, page: currentPageNum };
-        fileConfigurations[currentFileIndex].signatureCoords = coords;
+        // Validar que el área tenga un tamaño mínimo
+        if (Math.abs(x2 - x1) > 10 && Math.abs(y2 - y1) > 10) {
+            saveSignatureCoords(x1, y1, x2, y2);
+            addLog(`✅ Área de firma creada para ${selectedFiles[currentFileIndex].name}`, 'success');
+        } else {
+            signatureSelector.style.display = 'none';
+            addLog('⚠️ El área seleccionada es muy pequeña. Intente nuevamente.', 'warning');
+        }
         
-        // Mostrar coordenadas
-        signatureCoords.style.display = 'block';
-        coordsText.textContent = `Página ${currentPageNum}: (${Math.round(x1)}, ${Math.round(y1)}) - (${Math.round(x2)}, ${Math.round(y2)})`;
+        signatureMode = 'none';
+        pdfCanvas.style.cursor = 'default';
         
-        addLog(`Área de firma seleccionada para ${selectedFiles[currentFileIndex].name}`, 'success');
+    } else if (signatureMode === 'moving' || signatureMode === 'resizing') {
+        // Guardar nueva posición/tamaño
+        const rect = pdfCanvas.getBoundingClientRect();
+        const canvasWidth = pdfCanvas.width;
+        const canvasHeight = pdfCanvas.height;
         
-        // Remover event listeners
-        pdfCanvas.removeEventListener('mousedown', handleMouseDown);
-        pdfCanvas.removeEventListener('mousemove', handleMouseMove);
-        pdfCanvas.removeEventListener('mouseup', handleMouseUp);
+        const selectorRect = signatureSelector.getBoundingClientRect();
+        const canvasRect = pdfCanvas.getBoundingClientRect();
         
-        signatureSelector.style.cursor = 'default';
-    };
+        const x1 = (selectorRect.left - canvasRect.left) / rect.width * canvasWidth;
+        const y1 = (selectorRect.top - canvasRect.top) / rect.height * canvasHeight;
+        const x2 = x1 + (selectorRect.width / rect.width * canvasWidth);
+        const y2 = y1 + (selectorRect.height / rect.height * canvasHeight);
+        
+        saveSignatureCoords(x1, y1, x2, y2);
+        
+        const action = signatureMode === 'moving' ? 'movida' : 'redimensionada';
+        addLog(`✅ Área de firma ${action} para ${selectedFiles[currentFileIndex].name}`, 'success');
+        
+        signatureMode = 'none';
+        pdfCanvas.style.cursor = 'default';
+        resizeHandle = null;
+        originalRect = null;
+    }
+}
+
+function handleCanvasMouseUp(e) {
+    // Este método se mantiene para compatibilidad pero la lógica principal está en handleDocumentMouseUp
+}
+
+function updateCursorForPosition(mouseX, mouseY) {
+    if (signatureMode !== 'none') return;
     
-    pdfCanvas.addEventListener('mousedown', handleMouseDown);
-    pdfCanvas.addEventListener('mousemove', handleMouseMove);
-    pdfCanvas.addEventListener('mouseup', handleMouseUp);
+    const existingCoords = fileConfigurations[currentFileIndex]?.signatureCoords;
+    if (!existingCoords || existingCoords.page !== currentPageNum) {
+        pdfCanvas.style.cursor = 'default';
+        return;
+    }
     
-    addLog('Haga clic y arrastre para seleccionar el área de firma', 'info');
+    const rect = pdfCanvas.getBoundingClientRect();
+    const canvasWidth = pdfCanvas.width;
+    const canvasHeight = pdfCanvas.height;
+    
+    const left = (existingCoords.x1 / canvasWidth) * rect.width;
+    const top = (existingCoords.y1 / canvasHeight) * rect.height;
+    const width = ((existingCoords.x2 - existingCoords.x1) / canvasWidth) * rect.width;
+    const height = ((existingCoords.y2 - existingCoords.y1) / canvasHeight) * rect.height;
+    
+    // Verificar handles de redimensionamiento
+    const handleSize = 8;
+    const handles = [
+        { x: left, y: top, cursor: 'nw-resize' },
+        { x: left + width/2, y: top, cursor: 'n-resize' },
+        { x: left + width, y: top, cursor: 'ne-resize' },
+        { x: left + width, y: top + height/2, cursor: 'e-resize' },
+        { x: left + width, y: top + height, cursor: 'se-resize' },
+        { x: left + width/2, y: top + height, cursor: 's-resize' },
+        { x: left, y: top + height, cursor: 'sw-resize' },
+        { x: left, y: top + height/2, cursor: 'w-resize' }
+    ];
+    
+    for (let handle of handles) {
+        if (Math.abs(mouseX - handle.x) <= handleSize && 
+            Math.abs(mouseY - handle.y) <= handleSize) {
+            pdfCanvas.style.cursor = handle.cursor;
+            return;
+        }
+    }
+    
+    // Verificar si está dentro del rectángulo
+    if (mouseX >= left && mouseX <= left + width && 
+        mouseY >= top && mouseY <= top + height) {
+        pdfCanvas.style.cursor = 'move';
+    } else {
+        pdfCanvas.style.cursor = 'default';
+    }
+}
+
+function saveSignatureCoords(x1, y1, x2, y2) {
+    const coords = { x1, y1, x2, y2, page: currentPageNum };
+    fileConfigurations[currentFileIndex].signatureCoords = coords;
+    
+    // Mostrar coordenadas
+    signatureCoords.style.display = 'block';
+    coordsText.textContent = `Página ${currentPageNum}: (${Math.round(x1)}, ${Math.round(y1)}) - (${Math.round(x2)}, ${Math.round(y2)})`;
+    
+    // Actualizar estilo del selector para mostrar que está guardado
+    signatureSelector.style.border = '2px solid #28a745';
+    signatureSelector.style.backgroundColor = 'rgba(40, 167, 69, 0.1)';
 }
 
 function clearSignatureArea() {
