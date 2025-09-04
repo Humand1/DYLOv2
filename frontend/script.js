@@ -104,8 +104,7 @@ function initializeApp() {
     fileInput.addEventListener('change', handleFileSelect);
     folderInput.addEventListener('change', handleFolderSelect);
     
-    // Drag and drop
-    uploadArea.addEventListener('click', () => fileInput.click());
+    // Drag and drop (solo en el área, no en el botón)
     uploadArea.addEventListener('dragover', handleDragOver);
     uploadArea.addEventListener('dragleave', handleDragLeave);
     uploadArea.addEventListener('drop', handleDrop);
@@ -413,6 +412,11 @@ function addFiles(files) {
     });
 }
 
+// Variables para paginación
+let currentPage = 1;
+let filesPerPage = 10;
+let fileSearchTerm = '';
+
 function updateFileList() {
     if (selectedFiles.length === 0) {
         fileList.style.display = 'none';
@@ -422,18 +426,207 @@ function updateFileList() {
     fileList.style.display = 'block';
     selectedFilesDiv.innerHTML = '';
     
-    selectedFiles.forEach((file, index) => {
-        const fileItem = document.createElement('div');
-        fileItem.className = 'file-item';
-        fileItem.innerHTML = `
-            <div class="file-info">
-                <i class="fas fa-file-pdf"></i>
-                <span class="file-name">${file.name}</span>
-                <small class="file-size">(${formatFileSize(file.size)})</small>
+    // Crear header con resumen y controles
+    const headerDiv = document.createElement('div');
+    headerDiv.className = 'file-list-header';
+    headerDiv.innerHTML = `
+        <div class="file-summary">
+            <h3>Archivos cargados: <span class="file-count">${selectedFiles.length}</span></h3>
+            <div class="file-controls">
+                <input type="text" id="fileSearch" placeholder="Buscar archivos..." class="file-search">
+                <button type="button" id="clearFiles" class="btn-secondary">
+                    <i class="fas fa-trash"></i> Limpiar selección
+                </button>
+            </div>
+        </div>
+    `;
+    selectedFilesDiv.appendChild(headerDiv);
+    
+    // Filtrar archivos según búsqueda
+    const filteredFiles = selectedFiles.filter(file => 
+        file.name.toLowerCase().includes(fileSearchTerm.toLowerCase())
+    );
+    
+    // Calcular paginación
+    const totalPages = Math.ceil(filteredFiles.length / filesPerPage);
+    const startIndex = (currentPage - 1) * filesPerPage;
+    const endIndex = startIndex + filesPerPage;
+    const filesToShow = filteredFiles.slice(startIndex, endIndex);
+    
+    // Crear contenedor de archivos
+    const filesContainer = document.createElement('div');
+    filesContainer.className = 'files-container';
+    
+    if (filesToShow.length === 0) {
+        filesContainer.innerHTML = '<p class="no-files">No se encontraron archivos que coincidan con la búsqueda.</p>';
+    } else {
+        filesToShow.forEach((file, displayIndex) => {
+            const actualIndex = selectedFiles.indexOf(file);
+            const fileItem = document.createElement('div');
+            fileItem.className = 'file-item';
+            fileItem.innerHTML = `
+                <div class="file-info">
+                    <i class="fas fa-file-pdf"></i>
+                    <span class="file-name" title="${file.name}">${truncateFileName(file.name, 50)}</span>
+                    <small class="file-size">(${formatFileSize(file.size)})</small>
+                </div>
+                <button type="button" class="btn-remove-file" data-index="${actualIndex}" title="Eliminar archivo">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            filesContainer.appendChild(fileItem);
+        });
+    }
+    
+    selectedFilesDiv.appendChild(filesContainer);
+    
+    // Crear controles de paginación si es necesario
+    if (totalPages > 1) {
+        const paginationDiv = document.createElement('div');
+        paginationDiv.className = 'file-pagination';
+        
+        let paginationHTML = '<div class="pagination-controls">';
+        
+        // Botón anterior
+        paginationHTML += `<button type="button" class="btn-pagination" id="prevPage" ${currentPage === 1 ? 'disabled' : ''}>
+            <i class="fas fa-chevron-left"></i> Anterior
+        </button>`;
+        
+        // Información de página
+        paginationHTML += `<span class="page-info">Página ${currentPage} de ${totalPages}</span>`;
+        
+        // Botón siguiente
+        paginationHTML += `<button type="button" class="btn-pagination" id="nextPage" ${currentPage === totalPages ? 'disabled' : ''}>
+            Siguiente <i class="fas fa-chevron-right"></i>
+        </button>`;
+        
+        paginationHTML += '</div>';
+        
+        // Selector de archivos por página
+        paginationHTML += `
+            <div class="pagination-options">
+                <label for="filesPerPageSelect">Mostrar:</label>
+                <select id="filesPerPageSelect" class="files-per-page-select">
+                    <option value="10" ${filesPerPage === 10 ? 'selected' : ''}>10 por página</option>
+                    <option value="25" ${filesPerPage === 25 ? 'selected' : ''}>25 por página</option>
+                    <option value="50" ${filesPerPage === 50 ? 'selected' : ''}>50 por página</option>
+                    <option value="100" ${filesPerPage === 100 ? 'selected' : ''}>100 por página</option>
+                </select>
             </div>
         `;
-        selectedFilesDiv.appendChild(fileItem);
+        
+        paginationDiv.innerHTML = paginationHTML;
+        selectedFilesDiv.appendChild(paginationDiv);
+        
+        // Event listeners para paginación
+        const prevBtn = paginationDiv.querySelector('#prevPage');
+        const nextBtn = paginationDiv.querySelector('#nextPage');
+        const filesPerPageSelect = paginationDiv.querySelector('#filesPerPageSelect');
+        
+        if (prevBtn) {
+            prevBtn.addEventListener('click', () => {
+                if (currentPage > 1) {
+                    currentPage--;
+                    updateFileList();
+                }
+            });
+        }
+        
+        if (nextBtn) {
+            nextBtn.addEventListener('click', () => {
+                if (currentPage < totalPages) {
+                    currentPage++;
+                    updateFileList();
+                }
+            });
+        }
+        
+        if (filesPerPageSelect) {
+            filesPerPageSelect.addEventListener('change', (e) => {
+                filesPerPage = parseInt(e.target.value);
+                currentPage = 1; // Reset to first page
+                updateFileList();
+            });
+        }
+    }
+    
+    // Event listeners para controles
+    const fileSearch = selectedFilesDiv.querySelector('#fileSearch');
+    const clearFiles = selectedFilesDiv.querySelector('#clearFiles');
+    const removeButtons = selectedFilesDiv.querySelectorAll('.btn-remove-file');
+    
+    if (fileSearch) {
+        fileSearch.value = fileSearchTerm;
+        fileSearch.addEventListener('input', (e) => {
+            fileSearchTerm = e.target.value;
+            currentPage = 1; // Reset to first page when searching
+            updateFileList();
+        });
+    }
+    
+    if (clearFiles) {
+        clearFiles.addEventListener('click', () => {
+            selectedFiles = [];
+            fileConfigurations = {};
+            currentPage = 1;
+            fileSearchTerm = '';
+            updateFileList();
+            updateFileStatus(0);
+            nextToConfigBtn.disabled = true;
+            addLog('Selección de archivos limpiada', 'info');
+        });
+    }
+    
+    removeButtons.forEach(button => {
+        button.addEventListener('click', (e) => {
+            const index = parseInt(e.target.closest('.btn-remove-file').dataset.index);
+            removeFile(index);
+        });
     });
+}
+
+function removeFile(index) {
+    const fileName = selectedFiles[index].name;
+    selectedFiles.splice(index, 1);
+    
+    // Reindexar configuraciones
+    const newConfigurations = {};
+    Object.keys(fileConfigurations).forEach(key => {
+        const oldIndex = parseInt(key);
+        if (oldIndex < index) {
+            newConfigurations[oldIndex] = fileConfigurations[oldIndex];
+        } else if (oldIndex > index) {
+            newConfigurations[oldIndex - 1] = fileConfigurations[oldIndex];
+        }
+    });
+    fileConfigurations = newConfigurations;
+    
+    // Ajustar página actual si es necesario
+    const totalPages = Math.ceil(selectedFiles.length / filesPerPage);
+    if (currentPage > totalPages && totalPages > 0) {
+        currentPage = totalPages;
+    }
+    
+    updateFileList();
+    updateFileStatus(selectedFiles.length);
+    
+    if (selectedFiles.length === 0) {
+        nextToConfigBtn.disabled = true;
+    }
+    
+    addLog(`Archivo eliminado: ${fileName}`, 'info');
+}
+
+function truncateFileName(fileName, maxLength) {
+    if (fileName.length <= maxLength) {
+        return fileName;
+    }
+    
+    const extension = fileName.split('.').pop();
+    const nameWithoutExt = fileName.substring(0, fileName.lastIndexOf('.'));
+    const truncatedName = nameWithoutExt.substring(0, maxLength - extension.length - 4) + '...';
+    
+    return truncatedName + '.' + extension;
 }
 
 function generateFileConfigList() {
