@@ -77,7 +77,24 @@ function initializeApp() {
     
     // Initial log
     addLog('Aplicación iniciada correctamente', 'info');
-    updateStatus('Listo');
+    updateStatus('Inicializando...');
+    
+    // Cargar automáticamente carpetas y usuarios al iniciar
+    addLog('Cargando datos automáticamente...', 'info');
+    loadFoldersAndUsers();
+}
+
+// Función para cargar carpetas y usuarios automáticamente
+async function loadFoldersAndUsers() {
+    try {
+        // Cargar carpetas y usuarios en paralelo
+        await Promise.all([loadFolders(), loadUsers()]);
+        updateStatus('Listo - Datos cargados automáticamente');
+        addLog('✅ Carga automática completada exitosamente', 'success');
+    } catch (error) {
+        addLog('⚠️ Error en la carga automática, puedes cargar manualmente', 'warning');
+        updateStatus('Listo - Carga manual disponible');
+    }
 }
 
 
