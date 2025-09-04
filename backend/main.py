@@ -174,28 +174,32 @@ async def upload_documents(
                 for processed_file in processed_files:
                     try:
                         # Preparar datos de firma si es necesario
-                        signature_data = None
-                        if requires_signature and coords:
-                            signature_data = APISignatureCoordinates(
-                                x1=coords['x1'],
-                                y1=coords['y1'],
-                                x2=coords['x2'],
-                                y2=coords['y2'],
-                                page=coords['page']
-                            )
+                        signature_coordinates_list = None
+                        signature_status = SignatureStatus.SIGNATURE_NOT_NEEDED
                         
-                        # Subir a Humand
-                        result = humand_client.upload_document(
-                            file_path=processed_file.file_path,
+                        if requires_signature and coords:
+                            signature_status = SignatureStatus.PENDING
+                            signature_coordinates_list = [APISignatureCoordinates(
+                                page=coords['page'],
+                                x=coords['x1'],
+                                y=coords['y1'],
+                                width=coords['x2'] - coords['x1'],
+                                height=coords['y2'] - coords['y1']
+                            )]
+                        
+                        # Subir a Humand usando el método correcto
+                        result = humand_client.upload_file(
+                            processed_file=processed_file,
                             folder_id=folder_id,
-                            signature_coordinates=signature_data
+                            signature_status=signature_status,
+                            signature_coordinates=signature_coordinates_list
                         )
                         
                         if result.get('success'):
                             uploaded_files += 1
                             success_details.append({
                                 'filename': processed_file.filename,
-                                'identifier': processed_file.username,
+                                'identifier': processed_file.identifier,
                                 'pages': processed_file.pages
                             })
                         else:
