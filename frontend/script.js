@@ -1272,7 +1272,7 @@ async function processDocuments() {
             }
         });
         
-        formData.append('signature_configs', JSON.stringify(signatureConfigs));
+        formData.append('signature_coordinates', JSON.stringify(signatureConfigs));
         
         const prefix = prefixInput.value.trim();
         if (prefix) {
