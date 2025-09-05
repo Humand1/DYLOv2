@@ -1086,7 +1086,7 @@ function updateCursorForPosition(mouseX, mouseY) {
     }
 }
 
-function saveSignatureCoords(x1, y1, x2, y2) {
+async function saveSignatureCoords(x1, y1, x2, y2) {
     // Validar que las coordenadas sean válidas
     if (x1 < 0 || y1 < 0 || x2 < 0 || y2 < 0) {
         addLog('⚠️ Error: Las coordenadas no pueden ser negativas', 'warning');
@@ -1108,25 +1108,59 @@ function saveSignatureCoords(x1, y1, x2, y2) {
     const maxX = Math.max(x1, x2);
     const maxY = Math.max(y1, y2);
     
-    const coords = { 
-        x1: Math.max(0, minX), 
-        y1: Math.max(0, minY), 
-        x2: Math.min(canvasWidth, maxX), 
-        y2: Math.min(canvasHeight, maxY), 
-        page: currentPageNum 
-    };
-    
-    fileConfigurations[currentFileIndex].signatureCoords = coords;
-    
-    // Mostrar coordenadas
-    signatureCoords.style.display = 'block';
-    coordsText.textContent = `Página ${currentPageNum}: (${Math.round(coords.x1)}, ${Math.round(coords.y1)}) - (${Math.round(coords.x2)}, ${Math.round(coords.y2)})`;
-    
-    // Actualizar estilo del selector para mostrar que está guardado
-    signatureSelector.style.border = '2px solid #28a745';
-    signatureSelector.style.backgroundColor = 'rgba(40, 167, 69, 0.1)';
-    
-    addLog(`✅ Coordenadas de firma validadas y guardadas: (${Math.round(coords.x1)}, ${Math.round(coords.y1)}) - (${Math.round(coords.x2)}, ${Math.round(coords.y2)})`, 'success');
+    try {
+        // Obtener dimensiones reales del PDF (no del canvas renderizado)
+        const page = await currentPdfDoc.getPage(currentPageNum);
+        const viewport = page.getViewport({ scale: 1.0 }); // Escala 1:1 para dimensiones reales
+        
+        // Calcular el factor de escala entre canvas y PDF real
+        const scaleX = viewport.width / canvasWidth;
+        const scaleY = viewport.height / canvasHeight;
+        
+        // Convertir coordenadas del canvas a coordenadas del PDF real
+        const pdfX1 = minX * scaleX;
+        const pdfY1 = minY * scaleY;
+        const pdfX2 = maxX * scaleX;
+        const pdfY2 = maxY * scaleY;
+        
+        // Normalizar coordenadas (dividir por dimensiones del PDF para obtener valores entre 0 y 1)
+        const normalizedX = pdfX1 / viewport.width;
+        const normalizedY = pdfY1 / viewport.height;
+        const normalizedWidth = (pdfX2 - pdfX1) / viewport.width;
+        const normalizedHeight = (pdfY2 - pdfY1) / viewport.height;
+        
+        // Validar que las coordenadas normalizadas estén en el rango correcto
+        if (normalizedX < 0 || normalizedY < 0 || normalizedX > 1 || normalizedY > 1 ||
+            normalizedWidth <= 0 || normalizedHeight <= 0 ||
+            (normalizedX + normalizedWidth) > 1 || (normalizedY + normalizedHeight) > 1) {
+            addLog('⚠️ Error: Las coordenadas normalizadas están fuera del rango válido', 'warning');
+            return;
+        }
+        
+        // Crear objeto de coordenadas en el formato correcto para la API de Humand
+        const coords = {
+            page: currentPageNum - 1, // Convertir a base 0 (primera página = 0)
+            x: normalizedX,
+            y: normalizedY,
+            width: normalizedWidth,
+            height: normalizedHeight
+        };
+        
+        fileConfigurations[currentFileIndex].signatureCoords = coords;
+        
+        // Mostrar coordenadas
+        signatureCoords.style.display = 'block';
+        coordsText.textContent = `Página ${currentPageNum}: x=${coords.x.toFixed(4)}, y=${coords.y.toFixed(4)}, w=${coords.width.toFixed(4)}, h=${coords.height.toFixed(4)}`;
+        
+        // Actualizar estilo del selector para mostrar que está guardado
+        signatureSelector.style.border = '2px solid #28a745';
+        signatureSelector.style.backgroundColor = 'rgba(40, 167, 69, 0.1)';
+        
+        addLog(`✅ Coordenadas de firma normalizadas y guardadas: página ${coords.page}, x=${coords.x.toFixed(4)}, y=${coords.y.toFixed(4)}, ancho=${coords.width.toFixed(4)}, alto=${coords.height.toFixed(4)}`, 'success');
+        
+    } catch (error) {
+        addLog(`❌ Error al procesar coordenadas de firma: ${error.message}`, 'error');
+    }
 }
 
 function clearSignatureArea() {
@@ -1143,15 +1177,16 @@ function clearSignatureArea() {
 function showExistingSignatureArea() {
     const coords = fileConfigurations[currentFileIndex]?.signatureCoords;
     
-    if (coords && coords.page === currentPageNum) {
+    if (coords && coords.page === (currentPageNum - 1)) { // coords.page está en base 0
         const rect = pdfCanvas.getBoundingClientRect();
         const canvasWidth = pdfCanvas.width;
         const canvasHeight = pdfCanvas.height;
         
-        const left = (coords.x1 / canvasWidth) * rect.width;
-        const top = (coords.y1 / canvasHeight) * rect.height;
-        const width = ((coords.x2 - coords.x1) / canvasWidth) * rect.width;
-        const height = ((coords.y2 - coords.y1) / canvasHeight) * rect.height;
+        // Convertir coordenadas normalizadas de vuelta a píxeles del canvas
+        const left = coords.x * rect.width;
+        const top = coords.y * rect.height;
+        const width = coords.width * rect.width;
+        const height = coords.height * rect.height;
         
         signatureSelector.style.display = 'block';
         signatureSelector.style.left = left + 'px';
@@ -1162,7 +1197,7 @@ function showExistingSignatureArea() {
         signatureSelector.style.backgroundColor = 'rgba(40, 167, 69, 0.1)';
         
         signatureCoords.style.display = 'block';
-        coordsText.textContent = `Página ${coords.page}: (${Math.round(coords.x1)}, ${Math.round(coords.y1)}) - (${Math.round(coords.x2)}, ${Math.round(coords.y2)})`;
+        coordsText.textContent = `Página ${currentPageNum}: x=${coords.x.toFixed(4)}, y=${coords.y.toFixed(4)}, w=${coords.width.toFixed(4)}, h=${coords.height.toFixed(4)}`;
     } else {
         signatureSelector.style.display = 'none';
         signatureCoords.style.display = 'none';

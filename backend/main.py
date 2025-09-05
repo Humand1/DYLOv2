@@ -185,10 +185,10 @@ async def upload_documents(
                             signature_status = SignatureStatus.PENDING
                             signature_coordinates_list = [APISignatureCoordinates(
                                 page=coords['page'],
-                                x=coords['x1'],
-                                y=coords['y1'],
-                                width=coords['x2'] - coords['x1'],
-                                height=coords['y2'] - coords['y1']
+                                x=coords['x'],
+                                y=coords['y'],
+                                width=coords['width'],
+                                height=coords['height']
                             )]
                         
                         # Subir a Humand usando el método correcto
