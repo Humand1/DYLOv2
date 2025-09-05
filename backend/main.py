@@ -126,63 +126,91 @@ async def upload_documents(
 ):
     """Procesa y sube múltiples archivos PDF a Humand"""
     
-    # Validar archivos PDF
-    for file in files:
-        if not file.filename.lower().endswith('.pdf'):
-            raise HTTPException(status_code=400, detail=f"El archivo {file.filename} no es un PDF")
+    # Lista para rastrear archivos temporales creados
+    temp_files_created = []
+    all_processed_files = []
+    processor = None
     
     try:
-        # Obtener usuarios para el procesamiento
+        # Log del inicio del procesamiento
+        print(f"[UPLOAD] Iniciando procesamiento de {len(files)} archivos")
+        
+        # Validar archivos PDF
+        for file in files:
+            if not file.filename.lower().endswith('.pdf'):
+                raise HTTPException(status_code=400, detail=f"El archivo {file.filename} no es un PDF")
+        
+        # Obtener usuarios para el procesamiento (nueva instancia cada vez)
         usuarios_rfc = redash_client.get_usuarios()
         if not usuarios_rfc:
             raise HTTPException(status_code=500, detail="No se pudieron cargar los usuarios")
+        
+        print(f"[UPLOAD] Usuarios cargados: {len(usuarios_rfc)}")
         
         # Procesar configuraciones de firma
         signature_configs = {}
         if signature_coordinates:
             try:
                 signature_configs = json.loads(signature_coordinates)
+                print(f"[UPLOAD] Configuraciones de firma procesadas: {len(signature_configs)}")
             except json.JSONDecodeError:
                 raise HTTPException(status_code=400, detail="Configuraciones de firma inválidas")
         
         # Convertir string a boolean
         send_notification_bool = send_notification.lower() == 'true'
         
-        # Procesar archivos
+        # Crear nuevas instancias para cada request (evitar caché)
         processor = PDFProcessor(usuarios_rfc)
         humand_client = HumandClient(HARDCODED_API_KEY)
         
-        all_processed_files = []
         uploaded_files = 0
         errors = []
         success_details = []
         
-        for file in files:
+        for file_idx, file in enumerate(files):
+            temp_file = None
             try:
-                # Crear archivo temporal
-                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
+                print(f"[UPLOAD] Procesando archivo {file_idx + 1}/{len(files)}: {file.filename}")
+                
+                # Crear archivo temporal con nombre único
+                temp_file = tempfile.NamedTemporaryFile(
+                    delete=False, 
+                    suffix=f'_{file_idx}_{file.filename}.pdf',
+                    prefix='dylo_upload_'
+                )
+                temp_files_created.append(temp_file.name)
+                
+                # Leer y escribir contenido
                 content = await file.read()
                 temp_file.write(content)
                 temp_file.close()
+                
+                print(f"[UPLOAD] Archivo temporal creado: {temp_file.name}")
                 
                 # Obtener configuración de firma para este archivo
                 file_signature_config = signature_configs.get(file.filename, {})
                 requires_signature = file_signature_config.get('requiresSignature', False)
                 coords = file_signature_config.get('signatureCoords')
                 
+                print(f"[UPLOAD] Configuración de firma - Requiere: {requires_signature}, Coords: {coords is not None}")
+                
                 # Procesar PDF
                 processed_files = processor.process_pdf(temp_file.name, prefix)
                 all_processed_files.extend(processed_files)
                 
+                print(f"[UPLOAD] PDF procesado en {len(processed_files)} archivos")
+                
                 # Subir cada archivo procesado
-                for processed_file in processed_files:
+                for proc_idx, processed_file in enumerate(processed_files):
                     try:
+                        print(f"[UPLOAD] Subiendo archivo procesado {proc_idx + 1}/{len(processed_files)}: {processed_file.filename}")
+                        
                         # Preparar datos de firma si es necesario
                         signature_coordinates_list = None
-                        signature_status = SignatureStatus.SIGNATURE_NOT_NEEDED
+                        current_signature_status = SignatureStatus.SIGNATURE_NOT_NEEDED
                         
                         if requires_signature and coords:
-                            signature_status = SignatureStatus.PENDING
+                            current_signature_status = SignatureStatus.PENDING
                             signature_coordinates_list = [APISignatureCoordinates(
                                 page=coords['page'],
                                 x=coords['x'],
@@ -190,12 +218,13 @@ async def upload_documents(
                                 width=coords['width'],
                                 height=coords['height']
                             )]
+                            print(f"[UPLOAD] Coordenadas de firma aplicadas: página {coords['page']}")
                         
                         # Subir a Humand usando el método correcto
                         result = humand_client.upload_file(
                             processed_file=processed_file,
                             folder_id=folder_id,
-                            signature_status=signature_status,
+                            signature_status=current_signature_status,
                             signature_coordinates=signature_coordinates_list,
                             send_notification=send_notification_bool
                         )
@@ -207,32 +236,32 @@ async def upload_documents(
                                 'identifier': processed_file.identifier,
                                 'pages': processed_file.pages
                             })
+                            print(f"[UPLOAD] ✅ Subido exitosamente: {processed_file.filename}")
                         else:
+                            error_msg = result.get('message', 'Error desconocido')
                             errors.append({
                                 'filename': processed_file.filename,
-                                'error': result.get('message', 'Error desconocido')
+                                'error': error_msg
                             })
+                            print(f"[UPLOAD] ❌ Error al subir: {processed_file.filename} - {error_msg}")
                     
                     except Exception as upload_error:
+                        error_msg = str(upload_error)
                         errors.append({
                             'filename': processed_file.filename,
-                            'error': str(upload_error)
+                            'error': error_msg
                         })
+                        print(f"[UPLOAD] ❌ Excepción al subir: {processed_file.filename} - {error_msg}")
                 
-                # Limpiar archivo temporal original
-                try:
-                    os.unlink(temp_file.name)
-                except:
-                    pass
-                    
             except Exception as file_error:
+                error_msg = str(file_error)
                 errors.append({
                     'filename': file.filename,
-                    'error': str(file_error)
+                    'error': error_msg
                 })
+                print(f"[UPLOAD] ❌ Error procesando archivo: {file.filename} - {error_msg}")
         
-        # Limpiar archivos procesados
-        processor.cleanup_temp_files(all_processed_files)
+        print(f"[UPLOAD] Procesamiento completado - Subidos: {uploaded_files}, Errores: {len(errors)}")
         
         return {
             "success": uploaded_files > 0,
@@ -245,11 +274,36 @@ async def upload_documents(
         }
         
     except Exception as e:
-        # Limpiar archivos temporales en caso de error
-        if 'all_processed_files' in locals():
-            processor.cleanup_temp_files(all_processed_files)
+        error_msg = str(e)
+        print(f"[UPLOAD] ❌ Error general en el proceso: {error_msg}")
+        raise HTTPException(status_code=500, detail=f"Error en el proceso: {error_msg}")
         
-        raise HTTPException(status_code=500, detail=f"Error en el proceso: {str(e)}")
+    finally:
+        # Limpieza exhaustiva de archivos temporales
+        print(f"[UPLOAD] Iniciando limpieza de archivos temporales...")
+        
+        # Limpiar archivos temporales originales
+        for temp_file_path in temp_files_created:
+            try:
+                if os.path.exists(temp_file_path):
+                    os.unlink(temp_file_path)
+                    print(f"[UPLOAD] Archivo temporal eliminado: {temp_file_path}")
+            except Exception as cleanup_error:
+                print(f"[UPLOAD] ⚠️ Error limpiando {temp_file_path}: {cleanup_error}")
+        
+        # Limpiar archivos procesados
+        if processor and all_processed_files:
+            try:
+                processor.cleanup_temp_files(all_processed_files)
+                print(f"[UPLOAD] Archivos procesados limpiados: {len(all_processed_files)}")
+            except Exception as cleanup_error:
+                print(f"[UPLOAD] ⚠️ Error limpiando archivos procesados: {cleanup_error}")
+        
+        # Forzar garbage collection
+        import gc
+        gc.collect()
+        
+        print(f"[UPLOAD] Limpieza completada")
 
 @app.get("/health")
 async def health_check():

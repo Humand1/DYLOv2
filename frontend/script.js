@@ -93,6 +93,9 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 function initializeApp() {
+    // Limpiar completamente el estado anterior
+    resetApplicationState();
+    
     // Paso 1: Folder management
     loadFoldersBtn.addEventListener('click', loadFolders);
     loadUsersBtn.addEventListener('click', loadUsers);
@@ -117,7 +120,7 @@ function initializeApp() {
     backToConfigBtn.addEventListener('click', () => goToStep(3));
     nextToProcessBtn.addEventListener('click', () => goToStep(5));
     backToPreviewBtn.addEventListener('click', () => goToStep(4));
-    startOverBtn.addEventListener('click', () => goToStep(1));
+    startOverBtn.addEventListener('click', () => resetAndStartOver());
     
     // Configuración
     prefixInput.addEventListener('input', updatePrefixPreview);
@@ -141,13 +144,112 @@ function initializeApp() {
     confirmNoBtn.addEventListener('click', hideConfirmModal);
     
     // Initial setup
-    addLog('Aplicación iniciada correctamente', 'info');
+    addLog('Aplicación iniciada correctamente - Estado limpio', 'info');
     updateStatus('Inicializando...');
     showStep(1);
     
     // Cargar automáticamente carpetas y usuarios
     addLog('Cargando datos automáticamente...', 'info');
     loadFoldersAndUsers();
+}
+
+// Función para resetear completamente el estado de la aplicación
+function resetApplicationState() {
+    addLog('🔄 Limpiando estado de la aplicación...', 'info');
+    
+    // Limpiar variables globales
+    selectedFiles = [];
+    folders = [];
+    users = {};
+    selectedFolder = null;
+    currentStep = 1;
+    fileConfigurations = {};
+    currentPdfDoc = null;
+    currentPageNum = 1;
+    currentFileIndex = 0;
+    signatureAreas = {};
+    
+    // Limpiar variables de paginación
+    currentPage = 1;
+    filesPerPage = 10;
+    fileSearchTerm = '';
+    
+    // Limpiar variables de firma
+    signatureMode = 'none';
+    dragStartX = undefined;
+    dragStartY = undefined;
+    resizeHandle = null;
+    originalRect = null;
+    
+    // Limpiar inputs de archivos
+    if (fileInput) fileInput.value = '';
+    if (folderInput) folderInput.value = '';
+    
+    // Limpiar formularios
+    if (prefixInput) prefixInput.value = '';
+    if (sendNotificationCheckbox) sendNotificationCheckbox.checked = true;
+    if (folderSearchInput) folderSearchInput.value = '';
+    
+    // Limpiar selectores
+    if (folderSelect) folderSelect.innerHTML = '<option value="">Seleccione una carpeta...</option>';
+    if (signatureFileSelect) signatureFileSelect.innerHTML = '';
+    
+    // Ocultar elementos
+    if (folderInfo) folderInfo.style.display = 'none';
+    if (fileList) fileList.style.display = 'none';
+    if (pdfPreviewContainer) pdfPreviewContainer.style.display = 'none';
+    if (signatureSelector) signatureSelector.style.display = 'none';
+    if (signatureCoords) signatureCoords.style.display = 'none';
+    if (progressSection) progressSection.style.display = 'none';
+    if (resultsSection) resultsSection.style.display = 'none';
+    if (confirmModal) confirmModal.style.display = 'none';
+    
+    // Limpiar contenedores
+    if (selectedFilesDiv) selectedFilesDiv.innerHTML = '';
+    if (fileConfigList) fileConfigList.innerHTML = '';
+    if (processSummary) processSummary.innerHTML = '';
+    if (resultsContent) resultsContent.innerHTML = '';
+    
+    // Resetear botones
+    if (nextToConfigBtn) nextToConfigBtn.disabled = true;
+    if (processBtn) {
+        processBtn.disabled = false;
+        processBtn.innerHTML = '<i class="fas fa-cogs"></i> Procesar y Subir Documentos';
+    }
+    
+    // Limpiar canvas PDF
+    if (pdfCanvas) {
+        const ctx = pdfCanvas.getContext('2d');
+        ctx.clearRect(0, 0, pdfCanvas.width, pdfCanvas.height);
+        pdfCanvas.style.cursor = 'default';
+    }
+    
+    // Eliminar handles de redimensionamiento
+    document.querySelectorAll('.resize-handle').forEach(handle => handle.remove());
+    
+    // Resetear estados visuales
+    updateStatus('Listo para nueva ejecución');
+    updateFolderStatus(0);
+    updateUserStatus(0);
+    updateFileStatus(0);
+    
+    // Limpiar clases CSS de drag and drop
+    if (uploadArea) uploadArea.classList.remove('dragover');
+    
+    addLog('✅ Estado de la aplicación completamente limpiado', 'success');
+}
+
+// Función mejorada para "Empezar de nuevo"
+function resetAndStartOver() {
+    addLog('🔄 Reiniciando aplicación completa...', 'info');
+    resetApplicationState();
+    goToStep(1);
+    
+    // Recargar datos automáticamente después del reset
+    setTimeout(() => {
+        addLog('Recargando datos automáticamente...', 'info');
+        loadFoldersAndUsers();
+    }, 500);
 }
 
 // Función para mostrar/ocultar pasos
