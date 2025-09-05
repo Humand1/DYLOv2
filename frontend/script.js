@@ -1087,16 +1087,46 @@ function updateCursorForPosition(mouseX, mouseY) {
 }
 
 function saveSignatureCoords(x1, y1, x2, y2) {
-    const coords = { x1, y1, x2, y2, page: currentPageNum };
+    // Validar que las coordenadas sean válidas
+    if (x1 < 0 || y1 < 0 || x2 < 0 || y2 < 0) {
+        addLog('⚠️ Error: Las coordenadas no pueden ser negativas', 'warning');
+        return;
+    }
+    
+    // Validar que las coordenadas estén dentro del canvas
+    const canvasWidth = pdfCanvas.width;
+    const canvasHeight = pdfCanvas.height;
+    
+    if (x1 >= canvasWidth || x2 >= canvasWidth || y1 >= canvasHeight || y2 >= canvasHeight) {
+        addLog('⚠️ Error: Las coordenadas están fuera del documento', 'warning');
+        return;
+    }
+    
+    // Asegurar que x1,y1 sea la esquina superior izquierda y x2,y2 la inferior derecha
+    const minX = Math.min(x1, x2);
+    const minY = Math.min(y1, y2);
+    const maxX = Math.max(x1, x2);
+    const maxY = Math.max(y1, y2);
+    
+    const coords = { 
+        x1: Math.max(0, minX), 
+        y1: Math.max(0, minY), 
+        x2: Math.min(canvasWidth, maxX), 
+        y2: Math.min(canvasHeight, maxY), 
+        page: currentPageNum 
+    };
+    
     fileConfigurations[currentFileIndex].signatureCoords = coords;
     
     // Mostrar coordenadas
     signatureCoords.style.display = 'block';
-    coordsText.textContent = `Página ${currentPageNum}: (${Math.round(x1)}, ${Math.round(y1)}) - (${Math.round(x2)}, ${Math.round(y2)})`;
+    coordsText.textContent = `Página ${currentPageNum}: (${Math.round(coords.x1)}, ${Math.round(coords.y1)}) - (${Math.round(coords.x2)}, ${Math.round(coords.y2)})`;
     
     // Actualizar estilo del selector para mostrar que está guardado
     signatureSelector.style.border = '2px solid #28a745';
     signatureSelector.style.backgroundColor = 'rgba(40, 167, 69, 0.1)';
+    
+    addLog(`✅ Coordenadas de firma validadas y guardadas: (${Math.round(coords.x1)}, ${Math.round(coords.y1)}) - (${Math.round(coords.x2)}, ${Math.round(coords.y2)})`, 'success');
 }
 
 function clearSignatureArea() {
