@@ -76,12 +76,15 @@ class HumandClient:
                 print(f"[HUMAND_DEBUG] Sin coordenadas de firma (signature_coordinates={signature_coordinates is not None}, status={signature_status})")
             
             # Logging del payload final
-            print(f"[HUMAND_DEBUG] Payload final a enviar:")
+            print(f"[HUMAND_DEBUG] Payload final a enviar a la API de Humand:")
             for key, value in payload.items():
                 if key == 'signatureCoordinates':
                     print(f"[HUMAND_DEBUG]   {key}: {value}")
                 else:
                     print(f"[HUMAND_DEBUG]   {key}: {value}")
+            
+            # Log específico del signatureStatus para confirmar el valor exacto
+            print(f"[HUMAND_DEBUG] *** CONFIRMACIÓN: signatureStatus enviado a API = '{payload['signatureStatus']}' ***")
             
             # Preparar el archivo
             with open(processed_file.file_path, 'rb') as file:
