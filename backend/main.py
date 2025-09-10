@@ -220,13 +220,15 @@ async def upload_documents(
                 
                 # Obtener configuración de firma para este archivo
                 file_signature_config = signature_configs.get(file.filename, {})
-                requires_signature = file_signature_config.get('requiresSignature', False)
+                signature_status_str = file_signature_config.get('signatureStatus', 'SIGNATURE_NOT_NEEDED')
+                requires_signature = signature_status_str == 'PENDING'
                 coords = file_signature_config.get('signatureCoords')
                 
-                print(f"[UPLOAD] Configuración de firma - Requiere: {requires_signature}, Coords: {coords is not None}")
+                print(f"[UPLOAD] Configuración de firma - Status: {signature_status_str}, Coords: {coords is not None}")
                 print(f"[SIGNATURE_DEBUG] Buscando configuración para archivo: '{file.filename}'")
                 print(f"[SIGNATURE_DEBUG] Configuraciones disponibles: {list(signature_configs.keys())}")
                 print(f"[SIGNATURE_DEBUG] Configuración encontrada: {file_signature_config}")
+                print(f"[SIGNATURE_DEBUG] signatureStatus recibido: '{signature_status_str}'")
                 
                 # Procesar PDF
                 processed_files = processor.process_pdf(temp_file.name, prefix)

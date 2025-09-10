@@ -1451,16 +1451,16 @@ async function processDocuments() {
             
             if (requiresSignature) {
                 signatureConfigs[file.name] = {
-                    requiresSignature: true,
+                    signatureStatus: "PENDING",
                     signatureCoords: fileConfigurations[index].signatureCoords
                 };
-                addLog(`🔍 DEBUG:   → Enviando requiresSignature: true`, 'info');
+                addLog(`🔍 DEBUG:   → Enviando signatureStatus: "PENDING"`, 'info');
             } else {
                 signatureConfigs[file.name] = {
-                    requiresSignature: false,
+                    signatureStatus: "SIGNATURE_NOT_NEEDED",
                     signatureCoords: null
                 };
-                addLog(`🔍 DEBUG:   → Enviando requiresSignature: false`, 'info');
+                addLog(`🔍 DEBUG:   → Enviando signatureStatus: "SIGNATURE_NOT_NEEDED"`, 'info');
             }
         });
         
