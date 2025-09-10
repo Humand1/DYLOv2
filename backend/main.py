@@ -210,6 +210,17 @@ async def upload_documents(
                 
                 print(f"[UPLOAD] PDF procesado en {len(processed_files)} archivos")
                 
+                # Limpiar archivo temporal original DESPUÉS del procesamiento
+                try:
+                    if os.path.exists(temp_file.name):
+                        os.unlink(temp_file.name)
+                        print(f"[UPLOAD] Archivo temporal original eliminado: {temp_file.name}")
+                        # Remover de la lista para evitar doble eliminación
+                        if temp_file.name in temp_files_created:
+                            temp_files_created.remove(temp_file.name)
+                except Exception as cleanup_error:
+                    print(f"[UPLOAD] ⚠️ Error limpiando archivo original {temp_file.name}: {cleanup_error}")
+                
                 # Subir cada archivo procesado
                 for proc_idx, processed_file in enumerate(processed_files):
                     try:
