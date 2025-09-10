@@ -238,18 +238,26 @@ async def upload_documents(
                         
                         # Preparar datos de firma si es necesario
                         signature_coordinates_list = None
-                        current_signature_status = SignatureStatus.SIGNATURE_NOT_NEEDED
                         
-                        if requires_signature and coords:
+                        if requires_signature:
                             current_signature_status = SignatureStatus.PENDING
-                            signature_coordinates_list = [APISignatureCoordinates(
-                                page=coords['page'],
-                                x=coords['x'],
-                                y=coords['y'],
-                                width=coords['width'],
-                                height=coords['height']
-                            )]
-                            print(f"[UPLOAD] Coordenadas de firma aplicadas: página {coords['page']}")
+                            print(f"[UPLOAD] Archivo marcado para firma digital: {processed_file.filename}")
+                            
+                            # Solo agregar coordenadas si existen
+                            if coords:
+                                signature_coordinates_list = [APISignatureCoordinates(
+                                    page=coords['page'],
+                                    x=coords['x'],
+                                    y=coords['y'],
+                                    width=coords['width'],
+                                    height=coords['height']
+                                )]
+                                print(f"[UPLOAD] Coordenadas de firma aplicadas: página {coords['page']}")
+                            else:
+                                print(f"[UPLOAD] Firma requerida pero sin coordenadas específicas")
+                        else:
+                            current_signature_status = SignatureStatus.SIGNATURE_NOT_NEEDED
+                            print(f"[UPLOAD] Archivo sin requerimiento de firma: {processed_file.filename}")
                         
                         # Subir a Humand usando el método correcto
                         result = humand_client.upload_file(
