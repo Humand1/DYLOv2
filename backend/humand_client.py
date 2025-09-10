@@ -40,6 +40,12 @@ class HumandClient:
             
             print(f"[HUMAND_CLIENT] Subiendo archivo: {processed_file.filename} desde {processed_file.file_path}")
             
+            # Logging detallado del signature_status recibido
+            print(f"[HUMAND_DEBUG] Parámetros recibidos:")
+            print(f"[HUMAND_DEBUG]   signature_status: {signature_status}")
+            print(f"[HUMAND_DEBUG]   signature_coordinates: {signature_coordinates is not None}")
+            print(f"[HUMAND_DEBUG]   send_notification: {send_notification}")
+            
             # Preparar los datos para la API
             payload = {
                 'folderId': str(folder_id),
@@ -48,6 +54,9 @@ class HumandClient:
                 'signatureStatus': signature_status.value,
                 'allowDisagreement': 'false'
             }
+            
+            print(f"[HUMAND_DEBUG] Payload base creado:")
+            print(f"[HUMAND_DEBUG]   signatureStatus: {payload['signatureStatus']}")
             
             # Si hay coordenadas de firma, añadirlas
             if signature_coordinates and signature_status == SignatureStatus.PENDING:
@@ -62,6 +71,17 @@ class HumandClient:
                     })
                 payload['signatureCoordinates'] = json.dumps(coords_list)
                 print(f"[HUMAND_CLIENT] Coordenadas de firma añadidas: {len(coords_list)} coordenadas")
+                print(f"[HUMAND_DEBUG] Coordenadas JSON: {payload['signatureCoordinates']}")
+            else:
+                print(f"[HUMAND_DEBUG] Sin coordenadas de firma (signature_coordinates={signature_coordinates is not None}, status={signature_status})")
+            
+            # Logging del payload final
+            print(f"[HUMAND_DEBUG] Payload final a enviar:")
+            for key, value in payload.items():
+                if key == 'signatureCoordinates':
+                    print(f"[HUMAND_DEBUG]   {key}: {value}")
+                else:
+                    print(f"[HUMAND_DEBUG]   {key}: {value}")
             
             # Preparar el archivo
             with open(processed_file.file_path, 'rb') as file:
@@ -71,6 +91,7 @@ class HumandClient:
                 
                 # URL de la API - El username es parte de la URL
                 url = f"{self.base_url}/users/{processed_file.identifier}/documents/files"
+                print(f"[HUMAND_DEBUG] URL de la API: {url}")
                 
                 # Realizar la solicitud a la API
                 response = requests.post(
@@ -79,6 +100,10 @@ class HumandClient:
                     data=payload,
                     files=files
                 )
+                
+                print(f"[HUMAND_DEBUG] Respuesta de la API:")
+                print(f"[HUMAND_DEBUG]   Status Code: {response.status_code}")
+                print(f"[HUMAND_DEBUG]   Response: {response.text[:200]}...")
                 
                 return {
                     'success': response.status_code in [200, 201],

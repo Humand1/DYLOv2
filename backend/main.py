@@ -153,6 +153,17 @@ async def upload_documents(
             try:
                 signature_configs = json.loads(signature_coordinates)
                 print(f"[UPLOAD] Configuraciones de firma procesadas: {len(signature_configs)}")
+                
+                # Logging detallado de configuraciones de firma
+                print(f"[SIGNATURE_DEBUG] Configuraciones de firma recibidas del frontend:")
+                for filename, config in signature_configs.items():
+                    requires_sig = config.get('requiresSignature', False)
+                    has_coords = config.get('signatureCoords') is not None
+                    print(f"[SIGNATURE_DEBUG]   {filename}: requiresSignature={requires_sig}, hasCoords={has_coords}")
+                    if has_coords:
+                        coords = config.get('signatureCoords')
+                        print(f"[SIGNATURE_DEBUG]     Coords: page={coords.get('page')}, x={coords.get('x'):.4f}, y={coords.get('y'):.4f}")
+                        
             except json.JSONDecodeError:
                 raise HTTPException(status_code=400, detail="Configuraciones de firma inválidas")
         
@@ -239,8 +250,13 @@ async def upload_documents(
                         # Preparar datos de firma si es necesario
                         signature_coordinates_list = None
                         
+                        # Logging detallado del estado de firma para cada archivo
+                        print(f"[SIGNATURE_DEBUG] Procesando archivo: {processed_file.filename}")
+                        print(f"[SIGNATURE_DEBUG]   requires_signature: {requires_signature}")
+                        
                         if requires_signature:
                             current_signature_status = SignatureStatus.PENDING
+                            print(f"[SIGNATURE_DEBUG]   current_signature_status: {current_signature_status}")
                             print(f"[UPLOAD] Archivo marcado para firma digital: {processed_file.filename}")
                             
                             # Solo agregar coordenadas si existen
@@ -252,12 +268,22 @@ async def upload_documents(
                                     width=coords['width'],
                                     height=coords['height']
                                 )]
+                                print(f"[SIGNATURE_DEBUG]   signature_coordinates_list: Creada con {len(signature_coordinates_list)} coordenada(s)")
                                 print(f"[UPLOAD] Coordenadas de firma aplicadas: página {coords['page']}")
                             else:
+                                print(f"[SIGNATURE_DEBUG]   signature_coordinates_list: None (sin coordenadas)")
                                 print(f"[UPLOAD] Firma requerida pero sin coordenadas específicas")
                         else:
                             current_signature_status = SignatureStatus.SIGNATURE_NOT_NEEDED
+                            print(f"[SIGNATURE_DEBUG]   current_signature_status: {current_signature_status}")
+                            print(f"[SIGNATURE_DEBUG]   signature_coordinates_list: None (no requiere firma)")
                             print(f"[UPLOAD] Archivo sin requerimiento de firma: {processed_file.filename}")
+                        
+                        # Logging antes del upload
+                        print(f"[SIGNATURE_DEBUG] Enviando a Humand:")
+                        print(f"[SIGNATURE_DEBUG]   archivo: {processed_file.filename}")
+                        print(f"[SIGNATURE_DEBUG]   signature_status: {current_signature_status}")
+                        print(f"[SIGNATURE_DEBUG]   tiene_coordenadas: {signature_coordinates_list is not None}")
                         
                         # Subir a Humand usando el método correcto
                         result = humand_client.upload_file(
