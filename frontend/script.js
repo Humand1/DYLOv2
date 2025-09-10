@@ -47,6 +47,7 @@ const startOverBtn = document.getElementById('startOver');
 const prefixInput = document.getElementById('prefix');
 const prefixPreview = document.getElementById('prefixPreview');
 const sendNotificationCheckbox = document.getElementById('sendNotification');
+const globalSignatureRequiredCheckbox = document.getElementById('globalSignatureRequired');
 const fileConfigList = document.getElementById('fileConfigList');
 
 // Elementos de vista previa PDF
@@ -124,6 +125,7 @@ function initializeApp() {
     
     // Configuración
     prefixInput.addEventListener('input', updatePrefixPreview);
+    globalSignatureRequiredCheckbox.addEventListener('change', handleGlobalSignatureChange);
     
     // Vista previa PDF
     signatureFileSelect.addEventListener('change', loadSelectedPdf);
@@ -188,6 +190,7 @@ function resetApplicationState() {
     // Limpiar formularios
     if (prefixInput) prefixInput.value = '';
     if (sendNotificationCheckbox) sendNotificationCheckbox.checked = true;
+    if (globalSignatureRequiredCheckbox) globalSignatureRequiredCheckbox.checked = false;
     if (folderSearchInput) folderSearchInput.value = '';
     
     // Limpiar selectores
@@ -743,19 +746,7 @@ function generateFileConfigList() {
                 <i class="fas fa-file-pdf"></i>
                 <span class="file-name">${file.name}</span>
             </div>
-            <div class="config-options">
-                <label class="checkbox-label">
-                    <input type="checkbox" id="signature_${index}" ${fileConfigurations[index].requiresSignature ? 'checked' : ''}>
-                    <span>Requiere firma digital</span>
-                </label>
-            </div>
         `;
-        
-        const checkbox = configItem.querySelector(`#signature_${index}`);
-        checkbox.addEventListener('change', (e) => {
-            fileConfigurations[index].requiresSignature = e.target.checked;
-            addLog(`${file.name}: ${e.target.checked ? 'Requiere' : 'No requiere'} firma`, 'info');
-        });
         
         fileConfigList.appendChild(configItem);
     });
@@ -1639,4 +1630,37 @@ function updateUserStatus(count) {
 
 function updateFileStatus(count) {
     fileStatus.querySelector('span').textContent = `${count} archivos`;
+}
+
+// Función para manejar el cambio del checkbox global de firma
+function handleGlobalSignatureChange(event) {
+    const isChecked = event.target.checked;
+    
+    // Aplicar la configuración a todos los archivos
+    selectedFiles.forEach((file, index) => {
+        fileConfigurations[index].requiresSignature = isChecked;
+        
+        // Si se desactiva la firma, limpiar las coordenadas
+        if (!isChecked) {
+            fileConfigurations[index].signatureCoords = null;
+        } else if (globalSignatureArea) {
+            // Si se activa y ya hay un área global definida, aplicarla
+            fileConfigurations[index].signatureCoords = globalSignatureArea;
+        }
+    });
+    
+    // Limpiar área global si se desactiva
+    if (!isChecked) {
+        globalSignatureArea = null;
+        signatureSelector.style.display = 'none';
+        signatureCoords.style.display = 'none';
+    }
+    
+    const action = isChecked ? 'activada' : 'desactivada';
+    addLog(`✅ Configuración de firma digital ${action} para todos los documentos (${selectedFiles.length} archivos)`, 'success');
+    
+    // Actualizar la vista previa si está visible
+    if (currentPdfDoc && pdfPreviewContainer.style.display === 'block') {
+        populateSignatureFileSelect();
+    }
 }
