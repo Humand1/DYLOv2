@@ -1435,19 +1435,37 @@ async function processDocuments() {
         
         // Agregar configuraciones de firma por archivo
         const signatureConfigs = {};
+        
+        // Logging detallado del estado del checkbox y configuraciones
+        const globalCheckboxChecked = globalSignatureRequiredCheckbox.checked;
+        addLog(`🔍 DEBUG: Checkbox global marcado: ${globalCheckboxChecked}`, 'info');
+        addLog(`🔍 DEBUG: Construyendo configuraciones de firma...`, 'info');
+        
         selectedFiles.forEach((file, index) => {
-            if (fileConfigurations[index].requiresSignature) {
+            const requiresSignature = fileConfigurations[index].requiresSignature;
+            const hasCoords = fileConfigurations[index].signatureCoords !== null;
+            
+            addLog(`🔍 DEBUG: Archivo ${file.name}:`, 'info');
+            addLog(`🔍 DEBUG:   fileConfigurations[${index}].requiresSignature = ${requiresSignature}`, 'info');
+            addLog(`🔍 DEBUG:   hasCoords = ${hasCoords}`, 'info');
+            
+            if (requiresSignature) {
                 signatureConfigs[file.name] = {
                     requiresSignature: true,
                     signatureCoords: fileConfigurations[index].signatureCoords
                 };
+                addLog(`🔍 DEBUG:   → Enviando requiresSignature: true`, 'info');
             } else {
                 signatureConfigs[file.name] = {
                     requiresSignature: false,
                     signatureCoords: null
                 };
+                addLog(`🔍 DEBUG:   → Enviando requiresSignature: false`, 'info');
             }
         });
+        
+        addLog(`🔍 DEBUG: JSON final a enviar:`, 'info');
+        addLog(`🔍 DEBUG: ${JSON.stringify(signatureConfigs, null, 2)}`, 'info');
         
         formData.append('signature_coordinates', JSON.stringify(signatureConfigs));
         
