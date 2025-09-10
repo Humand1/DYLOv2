@@ -87,19 +87,41 @@ class PDFProcessor:
                 else:
                     filename = f"{identificador}.pdf"
                 
-                # Crear archivo temporal
-                temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf')
-                new_doc.save(temp_file.name)
-                new_doc.close()
-                
-                # Crear objeto ProcessedFile
-                processed_file = ProcessedFile(
-                    filename=filename,
-                    identifier=identificador,
-                    pages=len(info['pages']),
-                    file_path=temp_file.name,
-                    is_username=info['is_username']
+                # Crear archivo temporal con nombre más descriptivo
+                temp_file = tempfile.NamedTemporaryFile(
+                    delete=False, 
+                    suffix='.pdf',
+                    prefix=f'processed_{identificador}_'
                 )
+                
+                try:
+                    new_doc.save(temp_file.name)
+                    new_doc.close()
+                    
+                    # Verificar que el archivo se creó correctamente
+                    if not os.path.exists(temp_file.name):
+                        raise Exception(f"No se pudo crear el archivo temporal: {temp_file.name}")
+                    
+                    print(f"[PDF_PROCESSOR] Archivo temporal creado: {temp_file.name} para {identificador}")
+                    
+                    # Crear objeto ProcessedFile
+                    processed_file = ProcessedFile(
+                        filename=filename,
+                        identifier=identificador,
+                        pages=len(info['pages']),
+                        file_path=temp_file.name,
+                        is_username=info['is_username']
+                    )
+                    
+                except Exception as e:
+                    new_doc.close()
+                    # Limpiar archivo temporal si hubo error
+                    try:
+                        if os.path.exists(temp_file.name):
+                            os.unlink(temp_file.name)
+                    except:
+                        pass
+                    raise Exception(f"Error al crear archivo para {identificador}: {str(e)}")
                 
                 processed_files.append(processed_file)
             

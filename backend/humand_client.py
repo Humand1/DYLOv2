@@ -1,5 +1,6 @@
 import requests
 import json
+import os
 from typing import List, Optional
 from .models import ProcessedFile, APISignatureCoordinates, SignatureStatus
 
@@ -29,6 +30,16 @@ class HumandClient:
             }
         
         try:
+            # Verificar que el archivo existe antes de intentar subirlo
+            if not os.path.exists(processed_file.file_path):
+                return {
+                    'success': False,
+                    'message': f'Archivo no encontrado: {processed_file.file_path}',
+                    'status_code': 0
+                }
+            
+            print(f"[HUMAND_CLIENT] Subiendo archivo: {processed_file.filename} desde {processed_file.file_path}")
+            
             # Preparar los datos para la API
             payload = {
                 'folderId': str(folder_id),
@@ -50,6 +61,7 @@ class HumandClient:
                         'height': coord.height
                     })
                 payload['signatureCoordinates'] = json.dumps(coords_list)
+                print(f"[HUMAND_CLIENT] Coordenadas de firma añadidas: {len(coords_list)} coordenadas")
             
             # Preparar el archivo
             with open(processed_file.file_path, 'rb') as file:
