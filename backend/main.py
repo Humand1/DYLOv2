@@ -173,9 +173,14 @@ async def upload_documents(
                 print(f"[UPLOAD] Procesando archivo {file_idx + 1}/{len(files)}: {file.filename}")
                 
                 # Crear archivo temporal con nombre único
+                # Remover extensión .pdf del filename original para evitar duplicación
+                base_filename = file.filename
+                if base_filename.lower().endswith('.pdf'):
+                    base_filename = base_filename[:-4]  # Remover los últimos 4 caracteres (.pdf)
+                
                 temp_file = tempfile.NamedTemporaryFile(
                     delete=False, 
-                    suffix=f'_{file_idx}_{file.filename}.pdf',
+                    suffix=f'_{file_idx}_{base_filename}.pdf',
                     prefix='dylo_upload_'
                 )
                 temp_files_created.append(temp_file.name)
