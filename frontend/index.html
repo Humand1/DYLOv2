@@ -123,12 +123,19 @@
 
             <!-- Paso 4: Vista Previa y Selección de Firma -->
             <section class="card step-card" id="step4" style="display: none;">
-                <h2><i class="fas fa-eye"></i> Paso 4: Vista Previa y Configuración de Firma</h2>
+                <h2><i class="fas fa-signature"></i> Paso 4: Configuración de Área de Firma Global</h2>
+                
+                <div class="global-signature-info">
+                    <div class="info-box">
+                        <i class="fas fa-info-circle"></i>
+                        <p><strong>Área de Firma Única:</strong> Defina una vez el área de firma que se aplicará automáticamente a todos los documentos que requieran firma digital.</p>
+                    </div>
+                </div>
                 
                 <div class="preview-container">
                     <div class="file-selector">
-                        <h3>Archivos que requieren firma:</h3>
-                        <select id="signatureFileSelect" size="5">
+                        <h3>Documento de referencia para definir el área:</h3>
+                        <select id="signatureFileSelect" size="3">
                             <!-- Se llenarán dinámicamente -->
                         </select>
                     </div>

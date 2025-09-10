@@ -8,7 +8,7 @@ let fileConfigurations = {};
 let currentPdfDoc = null;
 let currentPageNum = 1;
 let currentFileIndex = 0;
-let signatureAreas = {};
+let globalSignatureArea = null;
 
 // API Key hardcodeada
 const HARDCODED_API_KEY = 'NTQxMDcyMzpkMjJNc3RyNEh1VEtQSEl3NTJTSldlR1liaHI2R0dCVQ==';
@@ -167,7 +167,7 @@ function resetApplicationState() {
     currentPdfDoc = null;
     currentPageNum = 1;
     currentFileIndex = 0;
-    signatureAreas = {};
+    globalSignatureArea = null;
     
     // Limpiar variables de paginación
     currentPage = 1;
@@ -774,19 +774,16 @@ function populateSignatureFileSelect() {
         return;
     }
     
-    filesRequiringSignature.forEach((file, originalIndex) => {
-        const index = selectedFiles.indexOf(file);
-        const option = document.createElement('option');
-        option.value = index;
-        option.textContent = file.name;
-        signatureFileSelect.appendChild(option);
-    });
+    // Solo mostrar el primer archivo para definir el área de firma global
+    const firstFileIndex = selectedFiles.indexOf(filesRequiringSignature[0]);
+    const option = document.createElement('option');
+    option.value = firstFileIndex;
+    option.textContent = `${filesRequiringSignature[0].name} (Definir área para todos los documentos)`;
+    signatureFileSelect.appendChild(option);
     
     // Cargar el primer archivo automáticamente
-    if (filesRequiringSignature.length > 0) {
-        signatureFileSelect.selectedIndex = 0;
-        loadSelectedPdf();
-    }
+    signatureFileSelect.selectedIndex = 0;
+    loadSelectedPdf();
 }
 
 async function loadSelectedPdf() {
@@ -1248,17 +1245,29 @@ async function saveSignatureCoords(x1, y1, x2, y2) {
             height: normalizedHeight
         };
         
-        fileConfigurations[currentFileIndex].signatureCoords = coords;
+        // Guardar en la variable global
+        globalSignatureArea = coords;
+        
+        // Aplicar las mismas coordenadas a todos los archivos que requieran firma
+        selectedFiles.forEach((file, index) => {
+            if (fileConfigurations[index].requiresSignature) {
+                fileConfigurations[index].signatureCoords = coords;
+            }
+        });
         
         // Mostrar coordenadas
         signatureCoords.style.display = 'block';
-        coordsText.textContent = `Página ${currentPageNum}: x=${coords.x.toFixed(4)}, y=${coords.y.toFixed(4)}, w=${coords.width.toFixed(4)}, h=${coords.height.toFixed(4)}`;
+        coordsText.textContent = `Área global: Página ${currentPageNum}: x=${coords.x.toFixed(4)}, y=${coords.y.toFixed(4)}, w=${coords.width.toFixed(4)}, h=${coords.height.toFixed(4)}`;
         
         // Actualizar estilo del selector para mostrar que está guardado
         signatureSelector.style.border = '2px solid #28a745';
         signatureSelector.style.backgroundColor = 'rgba(40, 167, 69, 0.1)';
         
-        addLog(`✅ Coordenadas de firma normalizadas y guardadas: página ${coords.page}, x=${coords.x.toFixed(4)}, y=${coords.y.toFixed(4)}, ancho=${coords.width.toFixed(4)}, alto=${coords.height.toFixed(4)}`, 'success');
+        const filesWithSignature = selectedFiles.filter((file, index) => 
+            fileConfigurations[index].requiresSignature
+        ).length;
+        
+        addLog(`✅ Área de firma global definida y aplicada a ${filesWithSignature} documento(s): página ${coords.page}, x=${coords.x.toFixed(4)}, y=${coords.y.toFixed(4)}, ancho=${coords.width.toFixed(4)}, alto=${coords.height.toFixed(4)}`, 'success');
         
     } catch (error) {
         addLog(`❌ Error al procesar coordenadas de firma: ${error.message}`, 'error');
@@ -1269,11 +1278,21 @@ function clearSignatureArea() {
     signatureSelector.style.display = 'none';
     signatureCoords.style.display = 'none';
     
-    if (fileConfigurations[currentFileIndex]) {
-        fileConfigurations[currentFileIndex].signatureCoords = null;
-    }
+    // Limpiar área global
+    globalSignatureArea = null;
     
-    addLog(`Área de firma eliminada para ${selectedFiles[currentFileIndex].name}`, 'info');
+    // Eliminar coordenadas de todos los archivos que requieran firma
+    selectedFiles.forEach((file, index) => {
+        if (fileConfigurations[index].requiresSignature) {
+            fileConfigurations[index].signatureCoords = null;
+        }
+    });
+    
+    const filesWithSignature = selectedFiles.filter((file, index) => 
+        fileConfigurations[index].requiresSignature
+    ).length;
+    
+    addLog(`Área de firma global eliminada de ${filesWithSignature} documento(s)`, 'info');
 }
 
 function showExistingSignatureArea() {
