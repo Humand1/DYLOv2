@@ -178,9 +178,19 @@ async def upload_documents(
                 if base_filename.lower().endswith('.pdf'):
                     base_filename = base_filename[:-4]  # Remover los últimos 4 caracteres (.pdf)
                 
+                # Sanitizar el nombre del archivo para evitar rutas malformadas
+                import re
+                # Obtener solo el nombre del archivo sin rutas
+                clean_filename = os.path.basename(base_filename)
+                # Reemplazar caracteres especiales por guiones bajos
+                clean_filename = re.sub(r'[^\w\-_.]', '_', clean_filename)
+                # Limitar longitud para evitar nombres muy largos
+                if len(clean_filename) > 50:
+                    clean_filename = clean_filename[:50]
+                
                 temp_file = tempfile.NamedTemporaryFile(
                     delete=False, 
-                    suffix=f'_{file_idx}_{base_filename}.pdf',
+                    suffix=f'_{file_idx}_{clean_filename}.pdf',
                     prefix='dylo_upload_'
                 )
                 temp_files_created.append(temp_file.name)
