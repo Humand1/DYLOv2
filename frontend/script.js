@@ -117,10 +117,10 @@ function initializeApp() {
     // Navegación entre pasos
     nextToConfigBtn.addEventListener('click', () => goToStep(3));
     backToUploadBtn.addEventListener('click', () => goToStep(2));
-    nextToPreviewBtn.addEventListener('click', () => goToStep(4));
+    nextToPreviewBtn.addEventListener('click', () => goToNextStepFromConfig());
     backToConfigBtn.addEventListener('click', () => goToStep(3));
     nextToProcessBtn.addEventListener('click', () => goToStep(5));
-    backToPreviewBtn.addEventListener('click', () => goToStep(4));
+    backToPreviewBtn.addEventListener('click', () => goToPreviousStepFromProcess());
     startOverBtn.addEventListener('click', () => resetAndStartOver());
     
     // Configuración
@@ -1680,5 +1680,36 @@ function handleGlobalSignatureChange(event) {
     // Actualizar la vista previa si está visible
     if (currentPdfDoc && pdfPreviewContainer.style.display === 'block') {
         populateSignatureFileSelect();
+    }
+}
+
+// Funciones de navegación condicional
+function goToNextStepFromConfig() {
+    // Verificar si el checkbox global de firma está marcado
+    const requiresSignature = globalSignatureRequiredCheckbox.checked;
+    
+    if (requiresSignature) {
+        // Si requiere firma, ir al paso 4 (Configuración de Área de Firma)
+        addLog('📝 Firma digital requerida - Dirigiendo a configuración de área de firma', 'info');
+        goToStep(4);
+    } else {
+        // Si no requiere firma, saltar al paso 5 (Procesamiento)
+        addLog('⏭️ Sin firma digital requerida - Saltando al procesamiento', 'info');
+        goToStep(5);
+    }
+}
+
+function goToPreviousStepFromProcess() {
+    // Verificar si el checkbox global de firma está marcado
+    const requiresSignature = globalSignatureRequiredCheckbox.checked;
+    
+    if (requiresSignature) {
+        // Si requiere firma, regresar al paso 4 (Configuración de Área de Firma)
+        addLog('⬅️ Regresando a configuración de área de firma', 'info');
+        goToStep(4);
+    } else {
+        // Si no requiere firma, regresar al paso 3 (Configuración)
+        addLog('⬅️ Regresando a configuración general', 'info');
+        goToStep(3);
     }
 }
