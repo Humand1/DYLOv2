@@ -190,7 +190,12 @@ async def upload_documents(
                 temp_file.write(content)
                 temp_file.close()
                 
-                print(f"[UPLOAD] Archivo temporal creado: {temp_file.name}")
+                # Verificar que el archivo se creó correctamente
+                if not os.path.exists(temp_file.name):
+                    raise Exception(f"No se pudo crear el archivo temporal: {temp_file.name}")
+                
+                file_size = os.path.getsize(temp_file.name)
+                print(f"[UPLOAD] Archivo temporal creado: {temp_file.name} (tamaño: {file_size} bytes)")
                 
                 # Obtener configuración de firma para este archivo
                 file_signature_config = signature_configs.get(file.filename, {})

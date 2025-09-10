@@ -40,7 +40,15 @@ class PDFProcessor:
         processed_files = []
         
         try:
+            # Verificar que el archivo existe antes de procesarlo
+            if not os.path.exists(pdf_path):
+                raise Exception(f"Archivo no encontrado: {pdf_path}")
+            
+            file_size = os.path.getsize(pdf_path)
+            print(f"[PDF_PROCESSOR] Iniciando procesamiento de: {pdf_path} (tamaño: {file_size} bytes)")
+            
             doc = fitz.open(pdf_path)
+            print(f"[PDF_PROCESSOR] PDF abierto exitosamente, páginas: {len(doc)}")
             
             # Diccionario para agrupar páginas por RFC/identificador
             paginas_por_identificador = {}
