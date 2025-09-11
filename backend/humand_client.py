@@ -98,26 +98,28 @@ class HumandClient:
                 url = f"{self.base_url}/users/{processed_file.identifier}/documents/files"
                 print(f"[HUMAND_DEBUG] URL de la API: {url}")
                 
-                # IMPORTANTE: Para enviar JSON correctamente con archivos, usar json parameter para datos estructurados
-                # Separar datos simples (strings) de datos complejos (arrays/objects)
-                
-                # Datos simples como form data
+                # Preparar form data en el formato EXACTO que espera la API de Humand
                 form_data = {
                     'folderId': str(payload['folderId']),
                     'name': payload['name'],
                     'sendNotification': 'true' if payload['sendNotification'] else 'false',
-                    'signatureStatus': payload['signatureStatus'],
+                    'signatureStatus': payload['signatureStatus'],  # ESTE ES EL CAMPO CLAVE
                     'allowDisagreement': 'false'
                 }
                 
-                # Si hay coordenadas, añadirlas como JSON string (esto es lo que espera la API)
+                # Si hay coordenadas, añadirlas como JSON string en el formato correcto
                 if 'signatureCoordinates' in payload:
-                    form_data['signatureCoordinates'] = json.dumps(payload['signatureCoordinates'])
-                    print(f"[HUMAND_DEBUG] Coordenadas convertidas a JSON string para form-data: {form_data['signatureCoordinates']}")
+                    # Convertir a formato de array simple que espera la API
+                    coords_array = payload['signatureCoordinates']
+                    form_data['signatureCoordinates'] = json.dumps(coords_array)
+                    print(f"[HUMAND_DEBUG] Coordenadas en formato API: {form_data['signatureCoordinates']}")
                 
-                print(f"[HUMAND_DEBUG] Form data final a enviar:")
+                print(f"[HUMAND_DEBUG] Form data final (formato API de Humand):")
                 for key, value in form_data.items():
                     print(f"[HUMAND_DEBUG]   {key}: {value} (tipo: {type(value)})")
+                
+                # CONFIRMACIÓN CRÍTICA
+                print(f"[HUMAND_DEBUG] *** CONFIRMACIÓN FINAL: signatureStatus = '{form_data['signatureStatus']}' ***")
                 
                 # Realizar la solicitud a la API
                 response = requests.post(
