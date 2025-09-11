@@ -46,19 +46,21 @@ class HumandClient:
             print(f"[HUMAND_DEBUG]   signature_coordinates: {signature_coordinates is not None}")
             print(f"[HUMAND_DEBUG]   send_notification: {send_notification}")
             
-            # Preparar los datos para la API
+            # Preparar los datos para la API - FORMATO CORRECTO
             payload = {
-                'folderId': str(folder_id),
+                'folderId': int(folder_id),  # número, no string
                 'name': processed_file.filename,
-                'sendNotification': 'true' if send_notification else 'false',
+                'sendNotification': send_notification,  # boolean, no string
                 'signatureStatus': signature_status.value,
-                'allowDisagreement': 'false'
+                'allowDisagreement': False  # boolean, no string
             }
             
             print(f"[HUMAND_DEBUG] Payload base creado:")
             print(f"[HUMAND_DEBUG]   signatureStatus: {payload['signatureStatus']}")
+            print(f"[HUMAND_DEBUG]   sendNotification: {payload['sendNotification']} (tipo: {type(payload['sendNotification'])})")
+            print(f"[HUMAND_DEBUG]   folderId: {payload['folderId']} (tipo: {type(payload['folderId'])})")
             
-            # Si hay coordenadas de firma, añadirlas
+            # Si hay coordenadas de firma, añadirlas como ARRAY, no como string JSON
             if signature_coordinates and signature_status == SignatureStatus.PENDING:
                 coords_list = []
                 for coord in signature_coordinates:
@@ -69,9 +71,9 @@ class HumandClient:
                         'width': coord.width,
                         'height': coord.height
                     })
-                payload['signatureCoordinates'] = json.dumps(coords_list)
+                payload['signatureCoordinates'] = coords_list  # ARRAY DIRECTO, no json.dumps()
                 print(f"[HUMAND_CLIENT] Coordenadas de firma añadidas: {len(coords_list)} coordenadas")
-                print(f"[HUMAND_DEBUG] Coordenadas JSON: {payload['signatureCoordinates']}")
+                print(f"[HUMAND_DEBUG] Coordenadas como ARRAY: {payload['signatureCoordinates']}")
             else:
                 print(f"[HUMAND_DEBUG] Sin coordenadas de firma (signature_coordinates={signature_coordinates is not None}, status={signature_status})")
             
@@ -96,11 +98,32 @@ class HumandClient:
                 url = f"{self.base_url}/users/{processed_file.identifier}/documents/files"
                 print(f"[HUMAND_DEBUG] URL de la API: {url}")
                 
+                # IMPORTANTE: Para enviar JSON correctamente con archivos, usar json parameter para datos estructurados
+                # Separar datos simples (strings) de datos complejos (arrays/objects)
+                
+                # Datos simples como form data
+                form_data = {
+                    'folderId': str(payload['folderId']),
+                    'name': payload['name'],
+                    'sendNotification': 'true' if payload['sendNotification'] else 'false',
+                    'signatureStatus': payload['signatureStatus'],
+                    'allowDisagreement': 'false'
+                }
+                
+                # Si hay coordenadas, añadirlas como JSON string (esto es lo que espera la API)
+                if 'signatureCoordinates' in payload:
+                    form_data['signatureCoordinates'] = json.dumps(payload['signatureCoordinates'])
+                    print(f"[HUMAND_DEBUG] Coordenadas convertidas a JSON string para form-data: {form_data['signatureCoordinates']}")
+                
+                print(f"[HUMAND_DEBUG] Form data final a enviar:")
+                for key, value in form_data.items():
+                    print(f"[HUMAND_DEBUG]   {key}: {value} (tipo: {type(value)})")
+                
                 # Realizar la solicitud a la API
                 response = requests.post(
                     url,
                     headers=self.headers,
-                    data=payload,
+                    data=form_data,
                     files=files
                 )
                 
