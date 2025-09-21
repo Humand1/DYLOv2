@@ -109,10 +109,8 @@ function initializeApp() {
     fileInput.addEventListener('change', handleFileSelect);
     folderInput.addEventListener('change', handleFolderSelect);
     
-    // Drag and drop (solo en el área, no en el botón)
-    uploadArea.addEventListener('dragover', handleDragOver);
-    uploadArea.addEventListener('dragleave', handleDragLeave);
-    uploadArea.addEventListener('drop', handleDrop);
+    // Drag and drop mejorado
+    setupDragAndDrop();
     
     // Navegación entre pasos
     nextToConfigBtn.addEventListener('click', () => goToStep(3));
@@ -468,22 +466,215 @@ function handleFolderSelect(event) {
     addFiles(files);
 }
 
-function handleDragOver(event) {
-    event.preventDefault();
-    uploadArea.classList.add('dragover');
+// Configuración mejorada de drag and drop
+function setupDragAndDrop() {
+    // Configurar drag and drop para ambas áreas de subida
+    const dropAreas = [uploadArea, uploadFolderArea];
+    
+    dropAreas.forEach(area => {
+        // Prevenir comportamiento por defecto del navegador
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            area.addEventListener(eventName, preventDefaults, false);
+        });
+        
+        // Eventos específicos de drag and drop
+        area.addEventListener('dragenter', () => handleDragEnter(area), false);
+        area.addEventListener('dragover', () => handleDragOver(area), false);
+        area.addEventListener('dragleave', () => handleDragLeave(area), false);
+        area.addEventListener('drop', (e) => handleDrop(e, area), false);
+        
+        // Mejorar la experiencia visual
+        area.addEventListener('dragenter', () => {
+            area.style.transform = 'scale(1.02)';
+            area.style.transition = 'all 0.2s ease';
+        });
+        
+        area.addEventListener('dragleave', () => {
+            area.style.transform = 'scale(1)';
+        });
+    });
+    
+    // Configurar drag and drop global en el documento
+    document.addEventListener('dragover', preventDefaults, false);
+    document.addEventListener('drop', preventDefaults, false);
+    
+    // Agregar indicador visual global cuando se arrastra algo
+    document.addEventListener('dragenter', handleGlobalDragEnter, false);
+    document.addEventListener('dragleave', handleGlobalDragLeave, false);
 }
 
-function handleDragLeave(event) {
-    event.preventDefault();
-    uploadArea.classList.remove('dragover');
+function preventDefaults(e) {
+    e.preventDefault();
+    e.stopPropagation();
 }
 
-function handleDrop(event) {
-    event.preventDefault();
-    uploadArea.classList.remove('dragover');
+function handleDragEnter(area) {
+    area.classList.add('dragover');
+    area.style.borderColor = '#48bb78';
+    area.style.backgroundColor = 'rgba(72, 187, 120, 0.05)';
+    
+    // Agregar texto de ayuda
+    const helpText = area.querySelector('.upload-content p');
+    if (helpText) {
+        helpText.style.color = '#48bb78';
+        helpText.style.fontWeight = 'bold';
+        helpText.textContent = '¡Suelta los archivos aquí!';
+    }
+    
+    addLog('📁 Archivos detectados sobre el área de subida', 'info');
+    
+    // Mostrar indicador de validación
+    updateValidationIndicator(area, 'valid');
+}
+
+function handleDragOver(area) {
+    area.classList.add('dragover');
+}
+
+function handleDragLeave(area) {
+    // Solo remover la clase si realmente salimos del área
+    const rect = area.getBoundingClientRect();
+    const x = event.clientX;
+    const y = event.clientY;
+    
+    if (x < rect.left || x > rect.right || y < rect.top || y > rect.bottom) {
+        area.classList.remove('dragover');
+        area.style.borderColor = '#cbd5e0';
+        area.style.backgroundColor = '';
+        area.style.transform = 'scale(1)';
+        
+        // Restaurar texto original
+        const helpText = area.querySelector('.upload-content p');
+        if (helpText) {
+            helpText.style.color = '#718096';
+            helpText.style.fontWeight = 'normal';
+            helpText.textContent = area === uploadArea ? 
+                'Arrastre archivos PDF aquí o haga clic para seleccionar' : 
+                'Seleccione una carpeta con archivos PDF';
+        }
+        
+        // Limpiar indicador de validación
+        updateValidationIndicator(area, 'none');
+    }
+}
+
+function handleDrop(event, area) {
+    area.classList.remove('dragover');
+    area.style.borderColor = '#cbd5e0';
+    area.style.backgroundColor = '';
+    area.style.transform = 'scale(1)';
+    
+    // Restaurar texto original
+    const helpText = area.querySelector('.upload-content p');
+    if (helpText) {
+        helpText.style.color = '#718096';
+        helpText.style.fontWeight = 'normal';
+        helpText.textContent = area === uploadArea ? 
+            'Arrastre archivos PDF aquí o haga clic para seleccionar' : 
+            'Seleccione una carpeta con archivos PDF';
+    }
     
     const files = Array.from(event.dataTransfer.files);
-    addFiles(files);
+    
+    if (files.length === 0) {
+        addLog('⚠️ No se detectaron archivos en el drop', 'warning');
+        updateValidationIndicator(area, 'none');
+        return;
+    }
+    
+    addLog(`📁 ${files.length} archivo(s) detectado(s) por drag and drop`, 'info');
+    
+    // Validar tipos de archivo
+    const pdfFiles = files.filter(file => 
+        file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+    );
+    
+    const invalidFiles = files.filter(file => 
+        !(file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'))
+    );
+    
+    // Actualizar indicador visual según validación
+    if (invalidFiles.length > 0 && pdfFiles.length === 0) {
+        updateValidationIndicator(area, 'invalid');
+        addLog(`⚠️ ${invalidFiles.length} archivo(s) no válido(s) (solo PDF): ${invalidFiles.map(f => f.name).join(', ')}`, 'warning');
+    } else if (pdfFiles.length > 0) {
+        updateValidationIndicator(area, 'valid');
+        addLog(`✅ ${pdfFiles.length} archivo(s) PDF válido(s) listo(s) para procesar`, 'success');
+        if (invalidFiles.length > 0) {
+            addLog(`⚠️ ${invalidFiles.length} archivo(s) no válido(s) ignorado(s): ${invalidFiles.map(f => f.name).join(', ')}`, 'warning');
+        }
+        addFiles(pdfFiles);
+    } else {
+        updateValidationIndicator(area, 'none');
+        addLog('❌ No se encontraron archivos PDF válidos', 'error');
+    }
+}
+
+// Función para actualizar indicador visual de validación
+function updateValidationIndicator(area, status) {
+    const indicator = area.querySelector('.file-validation-indicator');
+    if (!indicator) return;
+    
+    // Remover clases anteriores
+    indicator.classList.remove('valid', 'invalid');
+    indicator.style.opacity = '0';
+    
+    if (status === 'valid') {
+        indicator.classList.add('valid');
+        indicator.innerHTML = '<i class="fas fa-check"></i>';
+        indicator.style.opacity = '1';
+    } else if (status === 'invalid') {
+        indicator.classList.add('invalid');
+        indicator.innerHTML = '<i class="fas fa-times"></i>';
+        indicator.style.opacity = '1';
+    }
+}
+
+// Manejo global de drag and drop
+function handleGlobalDragEnter(e) {
+    // Crear overlay visual si no existe
+    if (!document.getElementById('dragOverlay')) {
+        createDragOverlay();
+    }
+}
+
+function handleGlobalDragLeave(e) {
+    // Solo remover overlay si realmente salimos del documento
+    if (!e.relatedTarget || e.relatedTarget.nodeName === 'HTML') {
+        removeDragOverlay();
+    }
+}
+
+function createDragOverlay() {
+    const overlay = document.createElement('div');
+    overlay.id = 'dragOverlay';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(72, 187, 120, 0.1);
+        border: 3px dashed #48bb78;
+        z-index: 9999;
+        pointer-events: none;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+        color: #48bb78;
+        font-weight: bold;
+        backdrop-filter: blur(2px);
+    `;
+    overlay.innerHTML = '<i class="fas fa-file-upload"></i> Arrastra archivos PDF aquí';
+    document.body.appendChild(overlay);
+}
+
+function removeDragOverlay() {
+    const overlay = document.getElementById('dragOverlay');
+    if (overlay) {
+        overlay.remove();
+    }
 }
 
 function addFiles(files) {
