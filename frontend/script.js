@@ -556,7 +556,8 @@ function handleDragEnter(area) {
         helpText.textContent = '¡Suelta los archivos aquí!';
     }
     
-    addLog('📁 Archivos detectados sobre el área de subida', 'info');
+    const areaName = area === uploadArea ? 'Archivos Individuales' : 'Carpeta Completa';
+    addLog(`📁 Archivos detectados sobre el área: ${areaName}`, 'info');
     
     // Mostrar indicador de validación
     updateValidationIndicator(area, 'valid');
@@ -629,6 +630,10 @@ function handleDrop(event, area) {
     // Detectar si es una carpeta completa (tiene archivos con paths que incluyen "/")
     const hasSubdirectories = files.some(file => file.webkitRelativePath && file.webkitRelativePath.includes('/'));
     
+    // Logging detallado para debug
+    addLog(`🔍 DEBUG: Procesando ${files.length} archivo(s)`, 'info');
+    addLog(`🔍 DEBUG: hasSubdirectories = ${hasSubdirectories}`, 'info');
+    
     if (hasSubdirectories) {
         addLog(`📁 Carpeta completa detectada con ${files.length} archivo(s)`, 'info');
         
@@ -640,6 +645,9 @@ function handleDrop(event, area) {
         const invalidFiles = files.filter(file => 
             !(file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'))
         );
+        
+        // Debug detallado de archivos
+        addLog(`🔍 DEBUG: PDFs encontrados: ${pdfFiles.length}, Inválidos: ${invalidFiles.length}`, 'info');
         
         if (invalidFiles.length > 0) {
             addLog(`⚠️ ${invalidFiles.length} archivo(s) no válido(s) (solo PDF) en la carpeta`, 'warning');
@@ -715,9 +723,13 @@ function updateValidationIndicator(area, status) {
 
 // Función para resetear completamente el estado visual de las áreas de upload
 function resetUploadAreas() {
+    addLog('🔄 Iniciando reseteo del estado visual...', 'info');
+    
     const areas = [uploadArea, uploadFolderArea];
     
-    areas.forEach(area => {
+    areas.forEach((area, index) => {
+        const areaName = area === uploadArea ? 'Archivos Individuales' : 'Carpeta Completa';
+        
         // Limpiar clases CSS
         area.classList.remove('dragover');
         
@@ -741,12 +753,14 @@ function resetUploadAreas() {
         
         // Resetear indicador de validación
         updateValidationIndicator(area, 'none');
+        
+        addLog(`✅ Área "${areaName}" reseteada`, 'info');
     });
     
     // Limpiar overlay global
     removeDragOverlay();
     
-    addLog('🔄 Estado visual de las áreas de upload reseteado', 'info');
+    addLog('🔄 Estado visual de las áreas de upload reseteado completamente', 'success');
 }
 
 // Manejo global de drag and drop
@@ -1929,6 +1943,24 @@ function addLog(message, type = 'info') {
     
     logArea.appendChild(logEntry);
     logArea.scrollTop = logArea.scrollHeight;
+    
+    // También loggear a la consola del navegador
+    const consoleMessage = `[DYLO ${timestamp}] ${message}`;
+    switch(type) {
+        case 'error':
+            console.error(consoleMessage);
+            break;
+        case 'warning':
+            console.warn(consoleMessage);
+            break;
+        case 'success':
+            console.log(`%c${consoleMessage}`, 'color: #48bb78; font-weight: bold;');
+            break;
+        case 'info':
+        default:
+            console.log(`%c${consoleMessage}`, 'color: #4299e1;');
+            break;
+    }
 }
 
 function clearLog() {
