@@ -627,12 +627,17 @@ function handleDrop(event, area) {
         return;
     }
     
-    // Detectar si es una carpeta completa (tiene archivos con paths que incluyen "/")
-    const hasSubdirectories = files.some(file => file.webkitRelativePath && file.webkitRelativePath.includes('/'));
+    // Detectar si es una carpeta completa usando función auxiliar
+    const hasSubdirectories = isFolderDrop(files);
     
     // Logging detallado para debug
     addLog(`🔍 DEBUG: Procesando ${files.length} archivo(s)`, 'info');
-    addLog(`🔍 DEBUG: hasSubdirectories = ${hasSubdirectories}`, 'info');
+    files.forEach((file, index) => {
+        addLog(`🔍 DEBUG: Archivo ${index + 1}: ${file.name}`, 'info');
+        addLog(`🔍 DEBUG:   - webkitRelativePath: ${file.webkitRelativePath || 'undefined'}`, 'info');
+        addLog(`🔍 DEBUG:   - type: ${file.type}`, 'info');
+    });
+    addLog(`🔍 DEBUG: isFolderDrop = ${hasSubdirectories}`, 'info');
     
     if (hasSubdirectories) {
         addLog(`📁 Carpeta completa detectada con ${files.length} archivo(s)`, 'info');
@@ -699,6 +704,40 @@ function handleDrop(event, area) {
             setTimeout(() => resetUploadAreas(), 2000);
         }
     }
+}
+
+// Función auxiliar para detectar si los archivos provienen de una carpeta
+function isFolderDrop(files) {
+    if (!files || files.length === 0) return false;
+    
+    // Verificar si hay webkitRelativePath (indica que viene de una carpeta)
+    const hasWebkitRelativePath = files.some(file => file.webkitRelativePath);
+    
+    if (hasWebkitRelativePath) {
+        // Verificar si hay diferencias entre el nombre del archivo y su path relativo
+        const hasPathDifferences = files.some(file => 
+            file.webkitRelativePath && 
+            file.webkitRelativePath !== file.name &&
+            file.webkitRelativePath.includes('/')
+        );
+        
+        return hasPathDifferences;
+    }
+    
+    // Fallback: si hay múltiples archivos y todos tienen el mismo directorio base
+    if (files.length > 1) {
+        const firstPath = files[0].webkitRelativePath || files[0].name;
+        const baseDir = firstPath.split('/')[0];
+        
+        const allSameBase = files.every(file => {
+            const filePath = file.webkitRelativePath || file.name;
+            return filePath.split('/')[0] === baseDir;
+        });
+        
+        return allSameBase && baseDir !== files[0].name;
+    }
+    
+    return false;
 }
 
 // Función para actualizar indicador visual de validación
@@ -851,8 +890,17 @@ function handleGlobalDrop(event) {
     
     addLog(`🌐 Drop global detectado con ${files.length} archivo(s)`, 'info');
     
-    // Detectar si es una carpeta
-    const hasSubdirectories = files.some(file => file.webkitRelativePath && file.webkitRelativePath.includes('/'));
+    // Detectar si es una carpeta usando función auxiliar
+    const hasSubdirectories = isFolderDrop(files);
+    
+    // Debug detallado para entender qué está pasando
+    addLog(`🔍 DEBUG GLOBAL: Analizando ${files.length} archivo(s)`, 'info');
+    files.forEach((file, index) => {
+        addLog(`🔍 DEBUG GLOBAL: Archivo ${index + 1}: ${file.name}`, 'info');
+        addLog(`🔍 DEBUG GLOBAL:   - webkitRelativePath: ${file.webkitRelativePath || 'undefined'}`, 'info');
+        addLog(`🔍 DEBUG GLOBAL:   - type: ${file.type}`, 'info');
+    });
+    addLog(`🔍 DEBUG GLOBAL: isFolderDrop = ${hasSubdirectories}`, 'info');
     
     if (hasSubdirectories) {
         addLog(`📁 Carpeta detectada en drop global con ${files.length} archivo(s)`, 'info');
