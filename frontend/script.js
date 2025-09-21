@@ -139,6 +139,12 @@ function initializeApp() {
     clearLogBtn.addEventListener('click', clearLog);
     downloadLogBtn.addEventListener('click', downloadLog);
     
+    // Upload area reset
+    const resetUploadAreasBtn = document.getElementById('resetUploadAreas');
+    if (resetUploadAreasBtn) {
+        resetUploadAreasBtn.addEventListener('click', resetUploadAreas);
+    }
+    
     // Modal controls
     confirmYesBtn.addEventListener('click', processDocuments);
     confirmNoBtn.addEventListener('click', hideConfirmModal);
@@ -463,7 +469,36 @@ function handleFileSelect(event) {
 
 function handleFolderSelect(event) {
     const files = Array.from(event.target.files);
-    addFiles(files);
+    
+    if (files.length === 0) {
+        addLog('⚠️ No se detectaron archivos en la carpeta seleccionada', 'warning');
+        return;
+    }
+    
+    addLog(`📁 Carpeta seleccionada con ${files.length} archivo(s)`, 'info');
+    
+    // Filtrar solo archivos PDF
+    const pdfFiles = files.filter(file => 
+        file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+    );
+    
+    const invalidFiles = files.filter(file => 
+        !(file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'))
+    );
+    
+    if (invalidFiles.length > 0) {
+        addLog(`⚠️ ${invalidFiles.length} archivo(s) no válido(s) (solo PDF) en la carpeta`, 'warning');
+        // Mostrar algunos ejemplos de archivos no válidos
+        const examples = invalidFiles.slice(0, 5).map(f => f.name);
+        addLog(`   Ejemplos: ${examples.join(', ')}${invalidFiles.length > 5 ? '...' : ''}`, 'warning');
+    }
+    
+    if (pdfFiles.length > 0) {
+        addLog(`✅ ${pdfFiles.length} archivo(s) PDF válido(s) encontrado(s) en la carpeta`, 'success');
+        addFiles(pdfFiles);
+    } else {
+        addLog('❌ No se encontraron archivos PDF válidos en la carpeta seleccionada', 'error');
+    }
 }
 
 // Configuración mejorada de drag and drop
@@ -559,54 +594,102 @@ function handleDragLeave(area) {
 }
 
 function handleDrop(event, area) {
+    // Limpiar completamente el estado visual
     area.classList.remove('dragover');
     area.style.borderColor = '#cbd5e0';
     area.style.backgroundColor = '';
     area.style.transform = 'scale(1)';
+    area.style.borderStyle = 'dashed';
     
     // Restaurar texto original
     const helpText = area.querySelector('.upload-content p');
     if (helpText) {
         helpText.style.color = '#718096';
         helpText.style.fontWeight = 'normal';
+        helpText.style.opacity = '1';
+        helpText.style.transform = 'scale(1)';
         helpText.textContent = area === uploadArea ? 
             'Arrastre archivos PDF aquí o haga clic para seleccionar' : 
             'Seleccione una carpeta con archivos PDF';
     }
+    
+    // Limpiar overlay global si existe
+    removeDragOverlay();
     
     const files = Array.from(event.dataTransfer.files);
     
     if (files.length === 0) {
         addLog('⚠️ No se detectaron archivos en el drop', 'warning');
         updateValidationIndicator(area, 'none');
+        // Resetear estado después de un tiempo
+        setTimeout(() => resetUploadAreas(), 1000);
         return;
     }
     
-    addLog(`📁 ${files.length} archivo(s) detectado(s) por drag and drop`, 'info');
+    // Detectar si es una carpeta completa (tiene archivos con paths que incluyen "/")
+    const hasSubdirectories = files.some(file => file.webkitRelativePath && file.webkitRelativePath.includes('/'));
     
-    // Validar tipos de archivo
-    const pdfFiles = files.filter(file => 
-        file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
-    );
-    
-    const invalidFiles = files.filter(file => 
-        !(file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'))
-    );
-    
-    // Actualizar indicador visual según validación
-    if (invalidFiles.length > 0 && pdfFiles.length === 0) {
-        updateValidationIndicator(area, 'invalid');
-        addLog(`⚠️ ${invalidFiles.length} archivo(s) no válido(s) (solo PDF): ${invalidFiles.map(f => f.name).join(', ')}`, 'warning');
-    } else if (pdfFiles.length > 0) {
-        updateValidationIndicator(area, 'valid');
-        addLog(`✅ ${pdfFiles.length} archivo(s) PDF válido(s) listo(s) para procesar`, 'success');
+    if (hasSubdirectories) {
+        addLog(`📁 Carpeta completa detectada con ${files.length} archivo(s)`, 'info');
+        
+        // Para carpetas, procesar de manera similar a handleFolderSelect
+        const pdfFiles = files.filter(file => 
+            file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+        );
+        
+        const invalidFiles = files.filter(file => 
+            !(file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'))
+        );
+        
         if (invalidFiles.length > 0) {
-            addLog(`⚠️ ${invalidFiles.length} archivo(s) no válido(s) ignorado(s): ${invalidFiles.map(f => f.name).join(', ')}`, 'warning');
+            addLog(`⚠️ ${invalidFiles.length} archivo(s) no válido(s) (solo PDF) en la carpeta`, 'warning');
+            // Mostrar algunos ejemplos de archivos no válidos
+            const examples = invalidFiles.slice(0, 5).map(f => f.name);
+            addLog(`   Ejemplos: ${examples.join(', ')}${invalidFiles.length > 5 ? '...' : ''}`, 'warning');
         }
-        addFiles(pdfFiles);
+        
+        if (pdfFiles.length > 0) {
+            updateValidationIndicator(area, 'valid');
+            addLog(`✅ ${pdfFiles.length} archivo(s) PDF válido(s) encontrado(s) en la carpeta`, 'success');
+            addFiles(pdfFiles);
+        } else {
+            updateValidationIndicator(area, 'invalid');
+            addLog('❌ No se encontraron archivos PDF válidos en la carpeta', 'error');
+            // Resetear estado después de un tiempo
+            setTimeout(() => resetUploadAreas(), 2000);
+        }
     } else {
-        updateValidationIndicator(area, 'none');
-        addLog('❌ No se encontraron archivos PDF válidos', 'error');
+        // Procesamiento normal para archivos individuales
+        addLog(`📁 ${files.length} archivo(s) individual(es) detectado(s) por drag and drop`, 'info');
+        
+        // Validar tipos de archivo
+        const pdfFiles = files.filter(file => 
+            file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+        );
+        
+        const invalidFiles = files.filter(file => 
+            !(file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'))
+        );
+        
+        // Actualizar indicador visual según validación
+        if (invalidFiles.length > 0 && pdfFiles.length === 0) {
+            updateValidationIndicator(area, 'invalid');
+            addLog(`⚠️ ${invalidFiles.length} archivo(s) no válido(s) (solo PDF): ${invalidFiles.map(f => f.name).join(', ')}`, 'warning');
+            // Resetear estado después de un tiempo
+            setTimeout(() => resetUploadAreas(), 2000);
+        } else if (pdfFiles.length > 0) {
+            updateValidationIndicator(area, 'valid');
+            addLog(`✅ ${pdfFiles.length} archivo(s) PDF válido(s) listo(s) para procesar`, 'success');
+            if (invalidFiles.length > 0) {
+                addLog(`⚠️ ${invalidFiles.length} archivo(s) no válido(s) ignorado(s): ${invalidFiles.map(f => f.name).join(', ')}`, 'warning');
+            }
+            addFiles(pdfFiles);
+        } else {
+            updateValidationIndicator(area, 'none');
+            addLog('❌ No se encontraron archivos PDF válidos', 'error');
+            // Resetear estado después de un tiempo
+            setTimeout(() => resetUploadAreas(), 2000);
+        }
     }
 }
 
@@ -628,6 +711,42 @@ function updateValidationIndicator(area, status) {
         indicator.innerHTML = '<i class="fas fa-times"></i>';
         indicator.style.opacity = '1';
     }
+}
+
+// Función para resetear completamente el estado visual de las áreas de upload
+function resetUploadAreas() {
+    const areas = [uploadArea, uploadFolderArea];
+    
+    areas.forEach(area => {
+        // Limpiar clases CSS
+        area.classList.remove('dragover');
+        
+        // Resetear estilos inline
+        area.style.borderColor = '';
+        area.style.backgroundColor = '';
+        area.style.transform = '';
+        area.style.borderStyle = '';
+        
+        // Resetear contenido
+        const helpText = area.querySelector('.upload-content p');
+        if (helpText) {
+            helpText.style.color = '';
+            helpText.style.fontWeight = '';
+            helpText.style.opacity = '';
+            helpText.style.transform = '';
+            helpText.textContent = area === uploadArea ? 
+                'Arrastre archivos PDF aquí o haga clic para seleccionar' : 
+                'Seleccione una carpeta con archivos PDF';
+        }
+        
+        // Resetear indicador de validación
+        updateValidationIndicator(area, 'none');
+    });
+    
+    // Limpiar overlay global
+    removeDragOverlay();
+    
+    addLog('🔄 Estado visual de las áreas de upload reseteado', 'info');
 }
 
 // Manejo global de drag and drop
@@ -684,13 +803,18 @@ function addFiles(files) {
     
     if (pdfFiles.length === 0) {
         addLog('⚠️ No se seleccionaron archivos PDF válidos', 'warning');
+        // Resetear estado visual si no hay archivos válidos
+        setTimeout(() => resetUploadAreas(), 1000);
         return;
     }
+    
+    // Limpiar archivos anteriores
+    selectedFiles = [];
+    fileConfigurations = {};
     
     selectedFiles = pdfFiles;
     
     // Inicializar configuraciones por defecto
-    fileConfigurations = {};
     pdfFiles.forEach((file, index) => {
         fileConfigurations[index] = {
             file: file,
@@ -703,10 +827,16 @@ function addFiles(files) {
     updateFileStatus(selectedFiles.length);
     nextToConfigBtn.disabled = false;
     
-    addLog(`📁 Se seleccionaron ${selectedFiles.length} archivo(s) PDF`, 'info');
+    // Resetear estado visual después de procesar archivos exitosamente
+    setTimeout(() => resetUploadAreas(), 800);
+    
+    addLog(`📁 Se procesaron ${selectedFiles.length} archivo(s) PDF exitosamente`, 'success');
     selectedFiles.forEach(file => {
         addLog(`  - ${file.name} (${formatFileSize(file.size)})`, 'info');
     });
+    
+    // Mostrar mensaje de éxito
+    addLog('✅ Archivos listos para continuar al siguiente paso', 'success');
 }
 
 // Variables para paginación
