@@ -531,7 +531,7 @@ function setupDragAndDrop() {
     
     // Configurar drag and drop global en el documento
     document.addEventListener('dragover', preventDefaults, false);
-    document.addEventListener('drop', preventDefaults, false);
+    document.addEventListener('drop', handleGlobalDrop, false);
     
     // Agregar indicador visual global cuando se arrastra algo
     document.addEventListener('dragenter', handleGlobalDragEnter, false);
@@ -792,21 +792,116 @@ function createDragOverlay() {
         z-index: 9999;
         pointer-events: none;
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
         font-size: 2rem;
         color: #48bb78;
         font-weight: bold;
         backdrop-filter: blur(2px);
+        animation: fadeIn 0.3s ease-out;
     `;
-    overlay.innerHTML = '<i class="fas fa-file-upload"></i> Arrastra archivos PDF aquí';
+    overlay.innerHTML = `
+        <i class="fas fa-file-upload" style="font-size: 4rem; margin-bottom: 20px;"></i>
+        <div style="text-align: center;">
+            <div>Arrastra archivos PDF o carpetas aquí</div>
+            <div style="font-size: 1rem; margin-top: 10px; opacity: 0.8;">
+                Puedes soltarlos en cualquier parte de la página
+            </div>
+        </div>
+    `;
     document.body.appendChild(overlay);
+    
+    addLog('🌐 Overlay global de drag and drop activado', 'info');
 }
 
 function removeDragOverlay() {
     const overlay = document.getElementById('dragOverlay');
     if (overlay) {
         overlay.remove();
+    }
+}
+
+// Manejo global de drop cuando se suelta fuera de las áreas específicas
+function handleGlobalDrop(event) {
+    event.preventDefault();
+    event.stopPropagation();
+    
+    // Limpiar overlay global
+    removeDragOverlay();
+    
+    // Verificar si el drop fue en una de las áreas específicas
+    const target = event.target;
+    const isInUploadArea = target.closest('.upload-area');
+    
+    if (isInUploadArea) {
+        // Si está en un área de upload, no hacer nada aquí
+        // El manejador específico del área se encargará
+        addLog('📍 Drop detectado en área de upload específica', 'info');
+        return;
+    }
+    
+    // Si no está en un área específica, procesar como drop global
+    const files = Array.from(event.dataTransfer.files);
+    
+    if (files.length === 0) {
+        addLog('⚠️ No se detectaron archivos en el drop global', 'warning');
+        return;
+    }
+    
+    addLog(`🌐 Drop global detectado con ${files.length} archivo(s)`, 'info');
+    
+    // Detectar si es una carpeta
+    const hasSubdirectories = files.some(file => file.webkitRelativePath && file.webkitRelativePath.includes('/'));
+    
+    if (hasSubdirectories) {
+        addLog(`📁 Carpeta detectada en drop global con ${files.length} archivo(s)`, 'info');
+        
+        // Procesar archivos de la carpeta
+        const pdfFiles = files.filter(file => 
+            file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+        );
+        
+        const invalidFiles = files.filter(file => 
+            !(file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'))
+        );
+        
+        if (invalidFiles.length > 0) {
+            addLog(`⚠️ ${invalidFiles.length} archivo(s) no válido(s) (solo PDF) en la carpeta`, 'warning');
+            const examples = invalidFiles.slice(0, 5).map(f => f.name);
+            addLog(`   Ejemplos: ${examples.join(', ')}${invalidFiles.length > 5 ? '...' : ''}`, 'warning');
+        }
+        
+        if (pdfFiles.length > 0) {
+            addLog(`✅ ${pdfFiles.length} archivo(s) PDF válido(s) encontrado(s) en la carpeta global`, 'success');
+            addFiles(pdfFiles);
+        } else {
+            addLog('❌ No se encontraron archivos PDF válidos en la carpeta global', 'error');
+        }
+    } else {
+        // Archivos individuales en drop global
+        addLog(`📁 ${files.length} archivo(s) individual(es) detectado(s) en drop global`, 'info');
+        
+        const pdfFiles = files.filter(file => 
+            file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+        );
+        
+        const invalidFiles = files.filter(file => 
+            !(file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf'))
+        );
+        
+        if (invalidFiles.length > 0 && pdfFiles.length === 0) {
+            addLog(`⚠️ ${invalidFiles.length} archivo(s) no válido(s) (solo PDF) en drop global`, 'warning');
+            addLog(`   Ejemplos: ${invalidFiles.slice(0, 5).map(f => f.name).join(', ')}`, 'warning');
+        } else if (pdfFiles.length > 0) {
+            addLog(`✅ ${pdfFiles.length} archivo(s) PDF válido(s) procesado(s) desde drop global`, 'success');
+            if (invalidFiles.length > 0) {
+                addLog(`⚠️ ${invalidFiles.length} archivo(s) no válido(s) ignorado(s)`, 'warning');
+            }
+            addFiles(pdfFiles);
+        } else {
+            addLog('❌ No se encontraron archivos PDF válidos en drop global', 'error');
+        }
     }
 }
 
