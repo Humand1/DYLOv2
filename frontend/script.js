@@ -1918,6 +1918,7 @@ async function processDocuments() {
         const globalCheckboxChecked = globalSignatureRequiredCheckbox.checked;
         addLog(`🔍 DEBUG: Checkbox global marcado: ${globalCheckboxChecked}`, 'info');
         addLog(`🔍 DEBUG: Construyendo configuraciones de firma...`, 'info');
+        addLog(`🔍 DEBUG: fileConfigurations actual: ${JSON.stringify(fileConfigurations, null, 2)}`, 'info');
         
         selectedFiles.forEach((file, index) => {
             const requiresSignature = fileConfigurations[index].requiresSignature;
@@ -2150,18 +2151,28 @@ function updateFileStatus(count) {
 function handleGlobalSignatureChange(event) {
     const isChecked = event.target.checked;
     
+    addLog(`🔍 DEBUG: handleGlobalSignatureChange llamado con isChecked: ${isChecked}`, 'info');
+    addLog(`🔍 DEBUG: selectedFiles.length: ${selectedFiles.length}`, 'info');
+    addLog(`🔍 DEBUG: fileConfigurations antes del cambio: ${JSON.stringify(fileConfigurations, null, 2)}`, 'info');
+    
     // Aplicar la configuración a todos los archivos
     selectedFiles.forEach((file, index) => {
         fileConfigurations[index].requiresSignature = isChecked;
         
+        addLog(`🔍 DEBUG: Archivo ${index} (${file.name}): requiresSignature = ${isChecked}`, 'info');
+        
         // Si se desactiva la firma, limpiar las coordenadas
         if (!isChecked) {
             fileConfigurations[index].signatureCoords = null;
+            addLog(`🔍 DEBUG: Archivo ${index}: coordenadas limpiadas`, 'info');
         } else if (globalSignatureArea) {
             // Si se activa y ya hay un área global definida, aplicarla
             fileConfigurations[index].signatureCoords = globalSignatureArea;
+            addLog(`🔍 DEBUG: Archivo ${index}: coordenadas aplicadas desde globalSignatureArea`, 'info');
         }
     });
+    
+    addLog(`🔍 DEBUG: fileConfigurations después del cambio: ${JSON.stringify(fileConfigurations, null, 2)}`, 'info');
     
     // Limpiar área global si se desactiva
     if (!isChecked) {

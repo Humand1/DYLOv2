@@ -229,6 +229,8 @@ async def upload_documents(
                 print(f"[SIGNATURE_DEBUG] Configuraciones disponibles: {list(signature_configs.keys())}")
                 print(f"[SIGNATURE_DEBUG] Configuración encontrada: {file_signature_config}")
                 print(f"[SIGNATURE_DEBUG] signatureStatus recibido: '{signature_status_str}'")
+                print(f"[SIGNATURE_DEBUG] *** DEBUGGING CHECKBOX: signature_status_str = '{signature_status_str}' ***")
+                print(f"[SIGNATURE_DEBUG] *** DEBUGGING CHECKBOX: requires_signature = {requires_signature} ***")
                 
                 # Procesar PDF
                 processed_files = processor.process_pdf(temp_file.name, prefix)
