@@ -134,6 +134,8 @@ async def upload_documents(
     try:
         # Log del inicio del procesamiento
         print(f"[UPLOAD] Iniciando procesamiento de {len(files)} archivos")
+        print(f"[UPLOAD_DEBUG] signature_status global recibido: '{signature_status}'")
+        print(f"[UPLOAD_DEBUG] signature_coordinates recibido: {signature_coordinates is not None}")
         
         # Validar archivos PDF
         for file in files:
@@ -157,9 +159,9 @@ async def upload_documents(
                 # Logging detallado de configuraciones de firma
                 print(f"[SIGNATURE_DEBUG] Configuraciones de firma recibidas del frontend:")
                 for filename, config in signature_configs.items():
-                    requires_sig = config.get('requiresSignature', False)
+                    requires_sig = config.get('signatureStatus', 'N/A')
                     has_coords = config.get('signatureCoords') is not None
-                    print(f"[SIGNATURE_DEBUG]   {filename}: requiresSignature={requires_sig}, hasCoords={has_coords}")
+                    print(f"[SIGNATURE_DEBUG]   {filename}: signatureStatus={requires_sig}, hasCoords={has_coords}")
                     if has_coords:
                         coords = config.get('signatureCoords')
                         print(f"[SIGNATURE_DEBUG]     Coords: page={coords.get('page')}, x={coords.get('x'):.4f}, y={coords.get('y'):.4f}")
@@ -218,19 +220,32 @@ async def upload_documents(
                 file_size = os.path.getsize(temp_file.name)
                 print(f"[UPLOAD] Archivo temporal creado: {temp_file.name} (tamaño: {file_size} bytes)")
                 
-                # Obtener configuración de firma para este archivo
-                file_signature_config = signature_configs.get(file.filename, {})
-                signature_status_str = file_signature_config.get('signatureStatus', 'SIGNATURE_NOT_NEEDED')
+                # CORRECCIÓN CRÍTICA: Obtener configuración de firma para este archivo
+                # Buscar por el nombre base del archivo sin la ruta de carpeta
+                base_filename_search = os.path.basename(file.filename)
+                file_signature_config = signature_configs.get(base_filename_search, {})
+                
+                # Si no se encuentra, intentar con el nombre completo
+                if not file_signature_config:
+                    file_signature_config = signature_configs.get(file.filename, {})
+                
+                signature_status_str = file_signature_config.get('signatureStatus', signature_status)
                 requires_signature = signature_status_str == 'PENDING'
                 coords = file_signature_config.get('signatureCoords')
                 
-                print(f"[UPLOAD] Configuración de firma - Status: {signature_status_str}, Coords: {coords is not None}")
-                print(f"[SIGNATURE_DEBUG] Buscando configuración para archivo: '{file.filename}'")
-                print(f"[SIGNATURE_DEBUG] Configuraciones disponibles: {list(signature_configs.keys())}")
-                print(f"[SIGNATURE_DEBUG] Configuración encontrada: {file_signature_config}")
-                print(f"[SIGNATURE_DEBUG] signatureStatus recibido: '{signature_status_str}'")
-                print(f"[SIGNATURE_DEBUG] *** DEBUGGING CHECKBOX: signature_status_str = '{signature_status_str}' ***")
-                print(f"[SIGNATURE_DEBUG] *** DEBUGGING CHECKBOX: requires_signature = {requires_signature} ***")
+                # DEBUGGING ADICIONAL CRÍTICO
+                print(f"[SIGNATURE_DEBUG] ============ ANÁLISIS DE CONFIGURACIÓN ============")
+                print(f"[SIGNATURE_DEBUG] Archivo original: {file.filename}")
+                print(f"[SIGNATURE_DEBUG] base_filename_search: {base_filename_search}")
+                print(f"[SIGNATURE_DEBUG] signature_status global recibido: '{signature_status}'")
+                print(f"[SIGNATURE_DEBUG] signature_configs keys: {list(signature_configs.keys()) if signature_configs else 'None'}")
+                print(f"[SIGNATURE_DEBUG] file_signature_config encontrado: {file_signature_config}")
+                print(f"[SIGNATURE_DEBUG] signature_status_str final: '{signature_status_str}'")
+                print(f"[SIGNATURE_DEBUG] requires_signature: {requires_signature}")
+                print(f"[SIGNATURE_DEBUG] tiene coordenadas: {coords is not None}")
+                if coords:
+                    print(f"[SIGNATURE_DEBUG] coordenadas: {coords}")
+                print(f"[SIGNATURE_DEBUG] ================================================")
                 
                 # Procesar PDF
                 processed_files = processor.process_pdf(temp_file.name, prefix)
@@ -254,12 +269,16 @@ async def upload_documents(
                     try:
                         print(f"[UPLOAD] Subiendo archivo procesado {proc_idx + 1}/{len(processed_files)}: {processed_file.filename}")
                         
+                        # DEBUGGING POR CADA ARCHIVO PROCESADO
+                        print(f"[SIGNATURE_DEBUG] ========== ARCHIVO PROCESADO {proc_idx + 1} ==========")
+                        print(f"[SIGNATURE_DEBUG] Archivo procesado: {processed_file.filename}")
+                        print(f"[SIGNATURE_DEBUG]   Original era: {file.filename}")
+                        print(f"[SIGNATURE_DEBUG]   signature_status_str: '{signature_status_str}'")
+                        print(f"[SIGNATURE_DEBUG]   requires_signature: {requires_signature}")
+                        print(f"[SIGNATURE_DEBUG]   tiene coordenadas: {coords is not None}")
+                        
                         # Preparar datos de firma si es necesario
                         signature_coordinates_list = None
-                        
-                        # Logging detallado del estado de firma para cada archivo
-                        print(f"[SIGNATURE_DEBUG] Procesando archivo: {processed_file.filename}")
-                        print(f"[SIGNATURE_DEBUG]   requires_signature: {requires_signature}")
                         
                         if requires_signature:
                             current_signature_status = SignatureStatus.PENDING
@@ -276,6 +295,7 @@ async def upload_documents(
                                     height=coords['height']
                                 )]
                                 print(f"[SIGNATURE_DEBUG]   signature_coordinates_list: Creada con {len(signature_coordinates_list)} coordenada(s)")
+                                print(f"[SIGNATURE_DEBUG]   coordenadas enviadas: page={coords['page']}, x={coords['x']:.4f}, y={coords['y']:.4f}")
                                 print(f"[UPLOAD] Coordenadas de firma aplicadas: página {coords['page']}")
                             else:
                                 print(f"[SIGNATURE_DEBUG]   signature_coordinates_list: None (sin coordenadas)")
@@ -287,10 +307,15 @@ async def upload_documents(
                             print(f"[UPLOAD] Archivo sin requerimiento de firma: {processed_file.filename}")
                         
                         # Logging antes del upload
-                        print(f"[SIGNATURE_DEBUG] Enviando a Humand:")
+                        print(f"[SIGNATURE_DEBUG] *** ENVIANDO A HUMAND ***")
                         print(f"[SIGNATURE_DEBUG]   archivo: {processed_file.filename}")
                         print(f"[SIGNATURE_DEBUG]   signature_status: {current_signature_status}")
+                        print(f"[SIGNATURE_DEBUG]   signature_status.value: {current_signature_status.value}")
                         print(f"[SIGNATURE_DEBUG]   tiene_coordenadas: {signature_coordinates_list is not None}")
+                        if signature_coordinates_list:
+                            coord = signature_coordinates_list[0]
+                            print(f"[SIGNATURE_DEBUG]   coordenadas: page={coord.page}, x={coord.x:.4f}, y={coord.y:.4f}")
+                        print(f"[SIGNATURE_DEBUG] *** ******************** ***")
                         
                         # Subir a Humand usando el método correcto
                         result = humand_client.upload_file(

@@ -1889,6 +1889,10 @@ function hideConfirmModal() {
     confirmModal.style.display = 'none';
 }
 
+
+// CORRECCIÓN en script.js - función processDocuments()
+// Busca esta sección alrededor de la línea 2150-2200:
+
 async function processDocuments() {
     hideConfirmModal();
     
@@ -1910,6 +1914,17 @@ async function processDocuments() {
         // Agregar configuraciones
         formData.append('folder_id', selectedFolder.folder_id);
         formData.append('api_key', HARDCODED_API_KEY);
+        
+        // AGREGAR ESTA LÍNEA CRÍTICA:
+        // Determinar el signature_status global basado en el checkbox
+        const globalSignatureStatus = globalSignatureRequiredCheckbox.checked ? 'PENDING' : 'SIGNATURE_NOT_NEEDED';
+        formData.append('signature_status', globalSignatureStatus);
+        
+        // DEBUGGING CRÍTICO:
+        addLog(`🔍 DEBUG CRÍTICO: Checkbox marcado: ${globalSignatureRequiredCheckbox.checked}`, 'info');
+        addLog(`🔍 DEBUG CRÍTICO: signature_status enviado: ${globalSignatureStatus}`, 'info');
+        
+        // ... resto del código existente ...
         
         // Agregar configuraciones de firma por archivo
         const signatureConfigs = {};
@@ -1947,6 +1962,7 @@ async function processDocuments() {
         addLog(`🔍 DEBUG: ${JSON.stringify(signatureConfigs, null, 2)}`, 'info');
         
         formData.append('signature_coordinates', JSON.stringify(signatureConfigs));
+        
         
         const prefix = prefixInput.value.trim();
         if (prefix) {
