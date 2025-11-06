@@ -1904,99 +1904,200 @@ async function processDocuments() {
         processBtn.disabled = true;
         processBtn.innerHTML = '<span class="loading"></span> Procesando...';
         
-        const formData = new FormData();
+        const MAX_BATCH_SIZE_BYTES = 3 * 1024 * 1024; // ≈3 MB por lote
+        const batches = [];
+        let currentBatch = [];
+        let currentBatchSize = 0;
         
-        // Agregar archivos
-        selectedFiles.forEach(file => {
-            formData.append('files', file);
-        });
+        for (let i = 0; i < selectedFiles.length; i++) {
+            const file = selectedFiles[i];
+            const fileSize = file?.size || 0;
+            
+            if (currentBatch.length > 0 && (currentBatchSize + fileSize) > MAX_BATCH_SIZE_BYTES) {
+                batches.push(currentBatch);
+                currentBatch = [];
+                currentBatchSize = 0;
+            }
+            
+            currentBatch.push(file);
+            currentBatchSize += fileSize;
+            
+            if (fileSize > MAX_BATCH_SIZE_BYTES) {
+                addLog(`⚠️ Archivo "${file.name}" (${formatFileSize(fileSize)}) excede el objetivo de 3MB. Se enviará en un lote individual.`, 'warning');
+                batches.push(currentBatch);
+                currentBatch = [];
+                currentBatchSize = 0;
+            }
+        }
         
-        // Agregar configuraciones
-        formData.append('folder_id', selectedFolder.folder_id);
-        formData.append('api_key', HARDCODED_API_KEY);
+        if (currentBatch.length > 0) {
+            batches.push(currentBatch);
+        }
         
-        // AGREGAR ESTA LÍNEA CRÍTICA:
-        // Determinar el signature_status global basado en el checkbox
+        const approxSizeMb = (MAX_BATCH_SIZE_BYTES / (1024 * 1024)).toFixed(1);
+        addLog(`📦 Procesando ${selectedFiles.length} archivos en ${batches.length} lotes (objetivo ≈${approxSizeMb} MB por lote)`, 'info');
+        
         const globalSignatureStatus = globalSignatureRequiredCheckbox.checked ? 'PENDING' : 'SIGNATURE_NOT_NEEDED';
-        formData.append('signature_status', globalSignatureStatus);
-        
-        // DEBUGGING CRÍTICO:
         addLog(`🔍 DEBUG CRÍTICO: Checkbox marcado: ${globalSignatureRequiredCheckbox.checked}`, 'info');
         addLog(`🔍 DEBUG CRÍTICO: signature_status enviado: ${globalSignatureStatus}`, 'info');
         
-        // ... resto del código existente ...
-        
-        // Agregar configuraciones de firma por archivo
-        const signatureConfigs = {};
-        
-        // Logging detallado del estado del checkbox y configuraciones
         const globalCheckboxChecked = globalSignatureRequiredCheckbox.checked;
         addLog(`🔍 DEBUG: Checkbox global marcado: ${globalCheckboxChecked}`, 'info');
-        addLog(`🔍 DEBUG: Construyendo configuraciones de firma...`, 'info');
+        addLog('🔍 DEBUG: Construyendo configuraciones de firma...', 'info');
         addLog(`🔍 DEBUG: fileConfigurations actual: ${JSON.stringify(fileConfigurations, null, 2)}`, 'info');
         
-        selectedFiles.forEach((file, index) => {
-            const requiresSignature = fileConfigurations[index].requiresSignature;
-            const hasCoords = fileConfigurations[index].signatureCoords !== null;
+        let totalUploaded = 0;
+        let totalErrors = [];
+        let allSuccessDetails = [];
+        let totalSkipped = 0;
+        
+        for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+            const batch = batches[batchIndex];
+            const batchNumber = batchIndex + 1;
+            const batchSizeBytes = batch.reduce((sum, file) => sum + (file?.size || 0), 0);
             
-            addLog(`🔍 DEBUG: Archivo ${file.name}:`, 'info');
-            addLog(`🔍 DEBUG:   fileConfigurations[${index}].requiresSignature = ${requiresSignature}`, 'info');
-            addLog(`🔍 DEBUG:   hasCoords = ${hasCoords}`, 'info');
+            addLog(`📤 Procesando lote ${batchNumber}/${batches.length} (${batch.length} archivos, ${formatFileSize(batchSizeBytes)})`, 'info');
             
-            if (requiresSignature) {
-                signatureConfigs[file.name] = {
-                    signatureStatus: "PENDING",
-                    signatureCoords: fileConfigurations[index].signatureCoords
-                };
-                addLog(`🔍 DEBUG:   → Enviando signatureStatus: "PENDING"`, 'info');
-            } else {
-                signatureConfigs[file.name] = {
-                    signatureStatus: "SIGNATURE_NOT_NEEDED",
-                    signatureCoords: null
-                };
-                addLog(`🔍 DEBUG:   → Enviando signatureStatus: "SIGNATURE_NOT_NEEDED"`, 'info');
+            try {
+                const formData = new FormData();
+                batch.forEach(file => formData.append('files', file));
+                formData.append('folder_id', selectedFolder.folder_id);
+                formData.append('api_key', HARDCODED_API_KEY);
+                formData.append('signature_status', globalSignatureStatus);
+                
+                const batchSignatureConfigs = {};
+                
+                batch.forEach(file => {
+                    const fileIndex = selectedFiles.indexOf(file);
+                    if (fileIndex === -1) {
+                        addLog(`⚠️ No se encontró configuración para ${file.name}.`, 'warning');
+                        return;
+                    }
+                    
+                    const requiresSignature = fileConfigurations[fileIndex].requiresSignature;
+                    const hasCoords = fileConfigurations[fileIndex].signatureCoords !== null;
+                    
+                    addLog(`🔍 DEBUG: Archivo ${file.name}:`, 'info');
+                    addLog(`🔍 DEBUG:   fileConfigurations[${fileIndex}].requiresSignature = ${requiresSignature}`, 'info');
+                    addLog(`🔍 DEBUG:   hasCoords = ${hasCoords}`, 'info');
+                    
+                    if (requiresSignature) {
+                        batchSignatureConfigs[file.name] = {
+                            signatureStatus: 'PENDING',
+                            signatureCoords: fileConfigurations[fileIndex].signatureCoords
+                        };
+                        addLog('🔍 DEBUG:   → Enviando signatureStatus: "PENDING"', 'info');
+                    } else {
+                        batchSignatureConfigs[file.name] = {
+                            signatureStatus: 'SIGNATURE_NOT_NEEDED',
+                            signatureCoords: null
+                        };
+                        addLog('🔍 DEBUG:   → Enviando signatureStatus: "SIGNATURE_NOT_NEEDED"', 'info');
+                    }
+                });
+                
+                addLog('🔍 DEBUG: JSON final a enviar:', 'info');
+                addLog(`🔍 DEBUG: ${JSON.stringify(batchSignatureConfigs, null, 2)}`, 'info');
+                
+                formData.append('signature_coordinates', JSON.stringify(batchSignatureConfigs));
+                
+                const prefix = prefixInput.value.trim();
+                if (prefix) {
+                    formData.append('prefix', prefix);
+                }
+                
+                const sendNotification = sendNotificationCheckbox.checked;
+                formData.append('send_notification', sendNotification.toString());
+                
+                const progressPercentage = batches.length > 0
+                    ? Math.floor(((batchIndex + 1) / batches.length) * 90) + 5
+                    : 100;
+                updateProgress(progressPercentage, `Procesando lote ${batchNumber}/${batches.length}...`);
+                
+                addLog(`🌐 Enviando lote ${batchNumber} con ${batch.length} archivos...`, 'info');
+                
+                const response = await fetch('/api/upload-documents', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const responseText = await response.text();
+                let result;
+                try {
+                    result = responseText ? JSON.parse(responseText) : {};
+                } catch {
+                    result = {
+                        success: false,
+                        message: responseText || 'Respuesta no válida del servidor',
+                        errors: []
+                    };
+                }
+                
+                const uploadedInBatch = result?.uploaded_files ?? 0;
+                const skippedInBatch = result?.skipped_files ?? 0;
+                
+                if (response.ok && result.success) {
+                    totalUploaded += uploadedInBatch;
+                    
+                    if (Array.isArray(result.success_details)) {
+                        allSuccessDetails = allSuccessDetails.concat(result.success_details);
+                    }
+                    
+                    addLog(`✅ Lote ${batchNumber} completado exitosamente: ${uploadedInBatch}/${batch.length} archivos subidos`, 'success');
+                } else {
+                    const errorMsg = result?.message || `Error desconocido en lote ${batchNumber}`;
+                    addLog(`❌ Error en lote ${batchNumber}: ${errorMsg}`, 'error');
+                    
+                    if (Array.isArray(result?.errors) && result.errors.length > 0) {
+                        totalErrors = totalErrors.concat(result.errors);
+                    } else {
+                        totalErrors.push({
+                            filename: `Lote ${batchNumber} completo`,
+                            error: errorMsg
+                        });
+                    }
+                }
+                
+                totalSkipped += skippedInBatch;
+                
+                if (batchIndex < batches.length - 1) {
+                    addLog('⏱️ Pausa de 1 segundo antes del siguiente lote...', 'info');
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+                
+            } catch (batchError) {
+                addLog(`❌ Error de conexión en lote ${batchIndex + 1}: ${batchError.message}`, 'error');
+                totalErrors.push({
+                    filename: `Lote ${batchIndex + 1} (Error de conexión)`,
+                    error: batchError.message
+                });
             }
-        });
-        
-        addLog(`🔍 DEBUG: JSON final a enviar:`, 'info');
-        addLog(`🔍 DEBUG: ${JSON.stringify(signatureConfigs, null, 2)}`, 'info');
-        
-        formData.append('signature_coordinates', JSON.stringify(signatureConfigs));
-        
-        
-        const prefix = prefixInput.value.trim();
-        if (prefix) {
-            formData.append('prefix', prefix);
         }
-        
-        // Agregar configuración de notificación
-        const sendNotification = sendNotificationCheckbox.checked;
-        formData.append('send_notification', sendNotification.toString());
-        
-        // Actualizar progreso
-        updateProgress(10, 'Subiendo archivos al servidor...');
-        
-        // Realizar la solicitud
-        const response = await fetch('/api/upload-documents', {
-            method: 'POST',
-            body: formData
-        });
-        
-        updateProgress(50, 'Procesando archivos en el servidor...');
-        
-        const result = await response.json();
         
         updateProgress(100, 'Procesamiento completado');
         
-        // Mostrar resultados
+        const finalResult = {
+            success: totalUploaded > 0,
+            message: `Procesamiento por lotes completado: ${totalUploaded}/${selectedFiles.length} archivos subidos en ${batches.length} lotes`,
+            uploaded_files: totalUploaded,
+            total_files: selectedFiles.length,
+            success_details: allSuccessDetails,
+            errors: totalErrors,
+            skipped_files: totalSkipped,
+            batches_processed: batches.length,
+            batch_target_size_bytes: MAX_BATCH_SIZE_BYTES
+        };
+        
+        addLog(`📊 Resumen final: ${totalUploaded}/${selectedFiles.length} archivos procesados en ${batches.length} lotes`, 'info');
+        
         setTimeout(() => {
-            showResults(result, response.ok);
+            showResults(finalResult, finalResult.success);
             progressSection.style.display = 'none';
             resultsSection.style.display = 'block';
         }, 1000);
         
     } catch (error) {
-        addLog(`❌ Error durante el procesamiento: ${error.message}`, 'error');
+        addLog(`❌ Error general durante el procesamiento: ${error.message}`, 'error');
         updateStatus('Error en el procesamiento');
         progressSection.style.display = 'none';
         
@@ -2009,7 +2110,6 @@ async function processDocuments() {
         }, false);
         
     } finally {
-        // Restaurar botón de proceso
         processBtn.disabled = false;
         processBtn.innerHTML = '<i class="fas fa-cogs"></i> Procesar y Subir Documentos';
     }
@@ -2051,7 +2151,18 @@ function showResults(result, success) {
             <div class="stat-card">
                 <div class="stat-number">${result.total_files}</div>
                 <div class="stat-label">Total Archivos</div>
-            </div>
+            </div>`;
+
+        if (result.batch_target_size_bytes) {
+            const targetSizeMb = (result.batch_target_size_bytes / (1024 * 1024)).toFixed(1);
+            content += `
+            <div class="stat-card">
+                <div class="stat-number">${targetSizeMb}</div>
+                <div class="stat-label">MB objetivo por Lote</div>
+            </div>`;
+        }
+
+        content += `
             <div class="stat-card">
                 <div class="stat-number">${result.skipped_files || 0}</div>
                 <div class="stat-label">Archivos Omitidos</div>
